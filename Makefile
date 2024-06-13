@@ -16,7 +16,7 @@ define Package/pbr/default
   CATEGORY:=Network
   SUBMENU:=Routing and Redirection
   TITLE:=Policy Based Routing Service
-  URL:=https://docs.openwrt.melmac.net/pbr/
+  URL:=https://github.com/stangri/pbr/
   DEPENDS:=+ip-full +jshn +jsonfilter +resolveip
 	DEPENDS+=+!BUSYBOX_DEFAULT_AWK:gawk
 	DEPENDS+=+!BUSYBOX_DEFAULT_GREP:grep
