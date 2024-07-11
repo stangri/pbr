@@ -81,20 +81,18 @@ define Build/Compile
 endef
 
 define Package/pbr/default/install
-	$(SED) "s|^\(readonly PKG_VERSION\).*|\1='$(PKG_VERSION)-$(PKG_RELEASE)'|" $(1)/etc/init.d/pbr
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN)  ./files/etc/uci-defaults/90-pbr $(1)/etc/uci-defaults/90-pbr
 	$(INSTALL_DIR) $(1)/usr/share/pbr
 	$(INSTALL_DATA) ./files/usr/share/pbr/.keep $(1)/usr/share/pbr/.keep
 	$(INSTALL_DATA) ./files/usr/share/pbr/pbr.user.wg_server_and_client $(1)/usr/share/pbr/pbr.user.wg_server_and_client
 endef
-#	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
-#	$(INSTALL_DATA) ./files/etc/hotplug.d/iface/70-pbr $(1)/etc/hotplug.d/iface/70-pbr
 
 define Package/pbr/install
 $(call Package/pbr/default/install,$(1))
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/pbr $(1)/etc/init.d/pbr
+	$(SED) "s|^\(readonly PKG_VERSION\).*|\1='$(PKG_VERSION)-$(PKG_RELEASE)'|" $(1)/etc/init.d/pbr
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/etc/config/pbr $(1)/etc/config/pbr
 	$(INSTALL_DIR) $(1)/usr/share/pbr
@@ -111,6 +109,7 @@ define Package/pbr-iptables/install
 $(call Package/pbr/default/install,$(1))
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/pbr-iptables $(1)/etc/init.d/pbr
+	$(SED) "s|^\(readonly PKG_VERSION\).*|\1='$(PKG_VERSION)-$(PKG_RELEASE)'|" $(1)/etc/init.d/pbr
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/firewall
 	$(INSTALL_DATA) ./files/etc/hotplug.d/firewall/70-pbr $(1)/etc/hotplug.d/firewall/70-pbr
 	$(INSTALL_DIR) $(1)/etc/config
