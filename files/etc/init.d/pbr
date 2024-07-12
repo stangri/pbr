@@ -1256,8 +1256,8 @@ dns_policy_routing() {
 		return 1
 	fi
 
-	dest4="dport 53 counter dnat ip to $dest_dns4"
-	dest6="dport 53 counter dnat ip to $dest_dns6"
+	dest4="dport 53 counter dnat ip to { $(inline_set "$dest_dns4") }"
+	dest6="dport 53 counter dnat ip to { $(inline_set "$dest_dns6") }"
 
 	if [ -n "$src_addr" ]; then
 		if [ "${src_addr:0:1}" = "!" ]; then
@@ -1553,21 +1553,31 @@ policy_process() {
 		output_fail; return 1;
 	fi
 
-	# TODO: process is_url returns for src_addr and dest_addr
-	if [ -n "$secure_reload" ] && { is_url_dl "$src_addr" || is_url_dl "$dest_addr"; }; then
-		state add 'errorSummary' 'errorNoDownloadWithSecureReload' "$name"
-	elif is_url "$src_addr"; then
-		src_addr="$(process_url "$src_addr")"
-	elif is_url "$dest_addr"; then
-		dest_addr="$(process_url "$dest_addr")"
-	fi
+	for i in $src_addr; do
+		if [ -n "$secure_reload" ] && is_url_dl "$i"; then
+			state add 'errorSummary' 'errorNoDownloadWithSecureReload' "$name"
+		elif is_url "$i"; then
+			i="$(process_url "$i")"
+		fi
+		j="${j:+$j }$i"
+	done
+	src_addr="$j"
+
+	for i in $dest_addr; do
+		if [ -n "$secure_reload" ] && is_url_dl "$i"; then
+			state add 'errorSummary' 'errorNoDownloadWithSecureReload' "$name"
+		elif is_url "$i"; then
+			i="$(process_url "$i")"
+		fi
+		j="${j:+$j }$i"
+	done
+	dest_addr="$j"
 
 	src_port="${src_port// /,}"; src_port="${src_port//,\!/ !}"; src_port="${src_port//  / }";
 	dest_port="${dest_port// /,}"; dest_port="${dest_port//,\!/ !}"; dest_port="${dest_port//  / }";
 
 	# TODO: if only src_addr is set add option 121 to dhcp leases?
 
-	# call policy_routing; group by type of src_addr and dest_addr values so that one nft set can be created per type within policy
 	local filter_list_src_addr='phys_dev phys_dev_negative mac_address mac_address_negative domain domain_negative ipv4 ipv4_negative ipv6 ipv6_negative'
 	local filter_list_dest_addr='domain domain_negative ipv4 ipv4_negative ipv6 ipv6_negative'
 	local filtered_value_src_addr filtered_value_dest_addr
