@@ -3098,10 +3098,10 @@ status_service_iptables() {
 		echo "$_SEPARATOR_"
 		echo "Current ipsets"
 		ipset save
-		if [ -s "$dnsmasqFile" ]; then
+		if [ -s "$dnsmasqFileDefault" ]; then
 			echo "$_SEPARATOR_"
 			echo "DNSMASQ sets"
-			cat "$dnsmasqFile"
+			cat "$dnsmasqFileDefault"
 		fi
 		if [ -s "$aghIpsetFile" ]; then
 			echo "$_SEPARATOR_"
@@ -3175,10 +3175,10 @@ status_service_nft() {
 	for i in $(get_nft_sets); do
 		"$nft" -a list table inet "$nftTable" | sed -n "/set ${i} {/,/\t}/p"
 	done
-	if [ -s "$dnsmasqFile" ]; then
+	if [ -s "$dnsmasqFileDefault" ]; then
 		echo "$_SEPARATOR_"
 		echo "dnsmasq sets"
-		cat "$dnsmasqFile"
+		cat "$dnsmasqFileDefault"
 	fi
 #	echo "$_SEPARATOR_"
 #	ip rule list | grep "${packageName}_"

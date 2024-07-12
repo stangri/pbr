@@ -131,9 +131,10 @@ str_first_word() { echo "${1%% *}"; }
 # shellcheck disable=SC2317
 str_replace() { printf "%b" "$1" | sed -e "s/$(printf "%b" "$2")/$(printf "%b" "$3")/g"; }
 str_replace() { echo "${1//$2/$3}"; }
+str_to_dnsmsaq_nftset() { echo "$1" | tr ' ' '/'; }
 str_to_lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 str_to_upper() { echo "$1" | tr 'a-z' 'A-Z'; }
-debug() { local i j; for i in "$@"; do eval "j=\$$i"; echo "${i}: ${j} "; done; }
+debug() { local i j; for i in "$@"; do eval "j=\$$i"; logger "${i}: ${j} "; done; }
 quiet_mode() {
 	case "$1" in
 		on) verbosity=0;;
@@ -1027,7 +1028,7 @@ _resolver_dnsmasq_confdir() {
 
 resolver() {
 	local agh_version
-	local param="$1"
+	local param="$1" iface="$2" target="$3" type="$4" uid="$5" name="$6" value="$7"
 	shift
 
 	if [ "$param" = 'cleanup_all' ]; then
@@ -1058,9 +1059,13 @@ resolver() {
 		dnsmasq.nftset)
 			case "$param" in
 				add_resolver_element)
-					[ -n "$resolver_set_supported" ] && nftset 'add_dnsmasq_element' "$@";;
+					[ -n "$resolver_set_supported" ] || return 1
+					nftset 'add_dnsmasq_element' "$iface" "$target" "$type" "$uid" "$name" "$(str_to_dnsmsaq_nftset "$value")"
+				;;
 				create_resolver_set)
-					[ -n "$resolver_set_supported" ] && nftset 'create_dnsmasq_set' "$@";;
+					[ -n "$resolver_set_supported" ] || return 1
+					nftset 'create_dnsmasq_set' "$iface" "$target" "$type" "$uid" "$name" "$value"
+				;;
 				check_support)
 					if [ ! -x "$nft" ]; then
 						state add 'errorSummary' 'errorNoNft'
@@ -1572,6 +1577,7 @@ policy_process() {
 		output_fail; return 1;
 	fi
 
+	unset j
 	for i in $src_addr; do
 		if [ -n "$secure_reload" ] && is_url_dl "$i"; then
 			state add 'errorSummary' 'errorNoDownloadWithSecureReload' "$name"
@@ -1582,6 +1588,7 @@ policy_process() {
 	done
 	src_addr="$j"
 
+	unset j
 	for i in $dest_addr; do
 		if [ -n "$secure_reload" ] && is_url_dl "$i"; then
 			state add 'errorSummary' 'errorNoDownloadWithSecureReload' "$name"
@@ -2042,20 +2049,11 @@ start_service() {
 			tid="$(get_rt_tables_id "$reloadedIface")"
 			pre_init_tid="$(eval echo "\$pre_init_tid_${reloadedIface//-/_}")"
 			if [ "$tid" = "$pre_init_tid" ]; then
-#				logger -t "$packageName" "Updated interface $reloadedIface TID: ${tid}; Pre-Init TID: ${pre_init_tid}. Reloading..."
 				serviceStartTrigger='on_interface_reload'
 			else
-#				logger -t "$packageName" "Updated interface $reloadedIface TID: ${tid}; Pre-Init TID: ${pre_init_tid}. Restarting..."
 				serviceStartTrigger='on_start'
 				unset reloadedIface
 			fi
-#			if is_ovpn "$reloadedIface"; then
-#				logger -t "$packageName" "Updated interface is an OpenVPN tunnel, restarting."
-#				serviceStartTrigger='on_start'
-#				unset reloadedIface
-#			else
-#				serviceStartTrigger='on_interface_reload'
-#			fi
 		;;
 		on_reload)
 			serviceStartTrigger='on_reload'
@@ -2078,11 +2076,6 @@ start_service() {
 	elif [ -z "$(ubus_get_status gateways)" ]; then
 		serviceStartTrigger='on_start'
 		unset reloadedIface
-#	elif [ "$serviceStartTrigger" = 'on_interface_reload' ] && \
-#			 [ -z "$(ubus_get_interface "$reloadedIface" 'gateway_ipv4')" ] && \
-#			 [ -z "$(ubus_get_interface "$reloadedIface" 'gateway_ipv6')" ]; then
-#		serviceStartTrigger='on_start'
-#		unset reloadedIface
 	else
 		serviceStartTrigger="${serviceStartTrigger:-on_start}"
 	fi
