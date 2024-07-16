@@ -1291,18 +1291,17 @@ dns_policy_routing() {
 		param6="$nftInsertOption rule inet ${nftTable} ${nftPrefix}_${chain} ${param6} ${proto_i} ${dest6} comment \"$name\""
 
 		local ipv4_error='0' ipv6_error='0'
-		if [ "$policy_routing_nft_prev_param4" != "$param4" ]; then
-			if [ -n "$first_value" ] && ! is_ipv6 "$first_value" && [ -z "$inline_set_ipv4_empty_flag" ]; then
+		if [ "$policy_routing_nft_prev_param4" != "$param4" ] && \
+			[ -n "$first_value" ] && ! is_ipv6 "$first_value" && \
+			[ -z "$inline_set_ipv4_empty_flag" ] && [ -n "$dest_dns_ipv4" ]; then
 				nft4 "$param4" || ipv4_error='1'
 				policy_routing_nft_prev_param4="$param4"
-			fi
 		fi
-		if [ "$policy_routing_nft_prev_param6" != "$param6" ] && \
-			[ "$param4" != "$param6" ]; then
-			if [ -n "$first_value" ] && ! is_ipv4 "$first_value" && [ -z "$inline_set_ipv6_empty_flag" ]; then
+		if [ "$policy_routing_nft_prev_param6" != "$param6" ] && [ "$param4" != "$param6" ] && \
+			[ -n "$first_value" ] && ! is_ipv4 "$first_value" && \
+			[ -z "$inline_set_ipv6_empty_flag" ] && [ -n "$dest_dns_ipv6" ]; then
 				nft6 "$param6" || ipv6_error='1'
 				policy_routing_nft_prev_param6="$param6"
-			fi
 		fi
 
 		if [ -n "$ipv6_enabled" ] && [ "$ipv4_error" -eq '1' ] && [ "$ipv6_error" -eq '1' ]; then
