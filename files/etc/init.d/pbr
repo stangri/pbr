@@ -1495,14 +1495,18 @@ policy_routing() {
 			param4="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} $param4 $dest4 comment \"$name\""
 			param6="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} $param6 $dest6 comment \"$name\""
 			local ipv4_error='0' ipv6_error='0'
-			if [ "$policy_routing_nft_prev_param4" != "$param4" ] && [ -z "$inline_set_ipv4_empty_flag" ]; then
-				nft4 "$param4" || ipv4_error='1'
-				policy_routing_nft_prev_param4="$param4"
+			if [ "$policy_routing_nft_prev_param4" != "$param4" ] && [ -z "$inline_set_ipv4_empty_flag" ] && \
+				[ "$filter_group_src_addr" != 'ipv6' ] && [ "$filter_group_src_addr" != 'ipv6_negative' ] && \
+				[ "$filter_group_dest_addr" != 'ipv6' ] && [ "$filter_group_dest_addr" != 'ipv6_negative' ]; then
+					nft4 "$param4" || ipv4_error='1'
+					policy_routing_nft_prev_param4="$param4"
 			fi
 			if [ "$policy_routing_nft_prev_param6" != "$param6" ] && \
-				[ "$param4" != "$param6" ] && [ -z "$inline_set_ipv6_empty_flag" ]; then
-				nft6 "$param6" || ipv6_error='1'
-				policy_routing_nft_prev_param6="$param6"
+				[ "$param4" != "$param6" ] && [ -z "$inline_set_ipv6_empty_flag" ]&& \
+				[ "$filter_group_src_addr" != 'ipv4' ] && [ "$filter_group_src_addr" != 'ipv4_negative' ] && \
+				[ "$filter_group_dest_addr" != 'ipv4' ] && [ "$filter_group_dest_addr" != 'ipv4_negative' ]; then
+					nft6 "$param6" || ipv6_error='1'
+					policy_routing_nft_prev_param6="$param6"
 			fi
 
 			if [ -n "$ipv6_enabled" ] && [ "$ipv4_error" -eq '1' ] && [ "$ipv6_error" -eq '1' ]; then
