@@ -1060,7 +1060,11 @@ resolver() {
 			case "$param" in
 				add_resolver_element)
 					[ -n "$resolver_set_supported" ] || return 1
-					nftset 'add_dnsmasq_element' "$iface" "$target" "$type" "$uid" "$name" "$(str_to_dnsmsaq_nftset "$value")"
+					local d
+					for d in $value; do
+						nftset 'add_dnsmasq_element' "$iface" "$target" "$type" "$uid" "$name" "$d"
+					done
+#					nftset 'add_dnsmasq_element' "$iface" "$target" "$type" "$uid" "$name" "$(str_to_dnsmsaq_nftset "$value")"
 				;;
 				create_resolver_set)
 					[ -n "$resolver_set_supported" ] || return 1
