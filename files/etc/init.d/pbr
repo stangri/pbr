@@ -244,14 +244,14 @@ filter_options() {
 		;;
 		ipv4)
 			for i in $value; do
-				if is_ipv4 "$i"; then
+				if is_ipv4 "$i" || is_ipv4_netmask "$i"; then
 					_ret="${_ret:+$_ret }$i"
 				fi
 			done
 		;;
 		ipv4_negative)
 			for i in $value; do
-				if is_negation "$i" && is_ipv4 "${i:1}"; then
+				if is_negation "$i" && { is_ipv4 "${i:1}" || is_ipv4_netmask "${i:1}"; }; then
 					_ret="${_ret:+$_ret }$i"
 				fi
 			done
@@ -1572,12 +1572,10 @@ dns_policy_process() {
 	for filter_group_src_addr in $filter_list_src_addr; do
 		filtered_value_src_addr=$(filter_options "$filter_group_src_addr" "$src_addr")
 		if [ -n "$src_addr" ] && [ -n "$filtered_value_src_addr" ]; then
-			if { [ "$filter_group_src_addr" = 'ipv4' ] || [ "$filter_group_src_addr" = 'ipv4_negative' ]; } && \
-				[ -z "$dest_dns_ipv4" ] ; then
+			if str_contains "$filter_group_src_addr" 'ipv4' && [ -z "$dest_dns_ipv4" ] ; then
 					continue
 			fi
-			if { [ "$filter_group_src_addr" = 'ipv6' ] || [ "$filter_group_src_addr" = 'ipv6_negative' ]; } && \
-				[ -z "$dest_dns_ipv6" ] ; then
+			if str_contains "$filter_group_src_addr" 'ipv6' && [ -z "$dest_dns_ipv6" ] ; then
 					continue
 			fi
 			dns_policy_routing "$name" "$filtered_value_src_addr" "$dest_dns" "$uid"
@@ -1654,12 +1652,10 @@ policy_process() {
 			for filter_group_dest_addr in $filter_list_dest_addr; do
 				filtered_value_dest_addr=$(filter_options "$filter_group_dest_addr" "$dest_addr")
 				if [ -z "$dest_addr" ] || { [ -n "$dest_addr" ] && [ -n "$filtered_value_dest_addr" ]; }; then
-					if { [ "$filter_group_src_addr" = 'ipv4' ] || [ "$filter_group_src_addr" = 'ipv4_negative' ]; } && \
-						{ [ "$filter_group_dest_addr" = 'ipv6' ] || [ "$filter_group_dest_addr" = 'ipv6_negative' ]; }; then
+					if str_contains "$filter_group_src_addr" 'ipv4' && str_contains "$filter_group_dest_addr" 'ipv6'; then
 							continue
 					fi
-					if { [ "$filter_group_src_addr" = 'ipv6' ] || [ "$filter_group_src_addr" = 'ipv6_negative' ]; } && \
-						{ [ "$filter_group_dest_addr" = 'ipv4' ] || [ "$filter_group_dest_addr" = 'ipv4_negative' ]; }; then
+					if str_contains "$filter_group_src_addr" 'ipv6' && str_contains "$filter_group_dest_addr" 'ipv4'; then
 							continue
 					fi
 					policy_routing "$name" "$interface" "$filtered_value_src_addr" "$src_port" "$filtered_value_dest_addr" "$dest_port" "$proto" "$chain" "$uid"
