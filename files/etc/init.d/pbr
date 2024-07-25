@@ -402,7 +402,7 @@ get_rt_tables_id() { local iface="$1"; grep "${ipTablePrefix}_${iface}\$" "$rtTa
 get_rt_tables_next_id() { echo "$(($(sort -r -n "$rtTablesFile" | grep -o -E -m 1 "^[0-9]+")+1))"; }
 get_rt_tables_non_pbr_next_id() { echo "$(($(grep -v "${ipTablePrefix}_" "$rtTablesFile" | sort -r -n  | grep -o -E -m 1 "^[0-9]+")+1))"; }
 # shellcheck disable=SC2016
-resolveip_to_nftset() { resolveip "$@" | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d' | tr '\n' ' '; }
+resolveip_to_nftset() { resolveip "$@" | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d'; }
 resolveip_to_nftset4() { resolveip_to_nftset -4 "$@"; }
 resolveip_to_nftset6() { [ -n "$ipv6_enabled" ] && resolveip_to_nftset -6 "$@"; }
 # shellcheck disable=SC2016
@@ -1278,7 +1278,7 @@ dns_policy_routing() {
 				param4="${param4:+$param4 }ether saddr ${negation:+$negation }{ $(inline_set "$value") }"
 				param6="${param6:+$param6 }ether saddr ${negation:+$negation }{ $(inline_set "$value") }"
 			elif is_domain "$first_value"; then
-				local inline_set_ipv4 inline_set_ipv6 d
+				local inline_set_ipv4='' inline_set_ipv6='' d=''
 				for d in $value; do
 					local resolved_ipv4 resolved_ipv6
 					resolved_ipv4="$(resolveip_to_nftset4 "$d")"
@@ -1337,7 +1337,8 @@ policy_routing() {
 	local mark i nftInsertOption='add'
 	local param4 param6 proto_i negation value dest4 dest6
 	local nftset_suffix first_value_src first_value_dest
-	local inline_set_ipv4_empty_flag inline_set_ipv6_empty_flag
+	local src_inline_set_ipv4_empty_flag src_inline_set_ipv6_empty_flag
+	local dest_inline_set_ipv4_empty_flag dest_inline_set_ipv6_empty_flag
 	local name="$1" iface="$2" src_addr="$3" src_port="$4" dest_addr="$5" dest_port="$6" proto chain uid="$9"
 	proto="$(str_to_lower "$7")"
 	chain="$(str_to_lower "$8")"
@@ -1410,7 +1411,9 @@ policy_routing() {
 				param4="${param4:+$param4 }ether saddr ${negation:+$negation }{ $(inline_set "$value") }"
 				param6="${param6:+$param6 }ether saddr ${negation:+$negation }{ $(inline_set "$value") }"
 			elif is_domain "$first_value_src"; then
-				local inline_set_ipv4 inline_set_ipv6 d
+				local inline_set_ipv4='' inline_set_ipv6='' d=''
+				unset src_inline_set_ipv4_empty_flag
+				unset src_inline_set_ipv6_empty_flag
 				for d in $value; do
 					local resolved_ipv4 resolved_ipv6
 					resolved_ipv4="$(resolveip_to_nftset4 "$d")"
@@ -1422,8 +1425,8 @@ policy_routing() {
 					[ -n "$resolved_ipv6" ] && inline_set_ipv6="${inline_set_ipv6:+$inline_set_ipv6, }$resolved_ipv6"
 					fi
 				done
-				[ -n "$inline_set_ipv4" ] || inline_set_ipv4_empty_flag='true'
-				[ -n "$inline_set_ipv6" ] || inline_set_ipv6_empty_flag='true'
+				[ -n "$inline_set_ipv4" ] || src_inline_set_ipv4_empty_flag='true'
+				[ -n "$inline_set_ipv6" ] || src_inline_set_ipv6_empty_flag='true'
 				param4="${param4:+$param4 }${nftIPv4Flag} saddr ${negation:+$negation }{ $inline_set_ipv4 }"
 				param6="${param6:+$param6 }${nftIPv6Flag} saddr ${negation:+$negation }{ $inline_set_ipv6 }"
 			else
@@ -1449,11 +1452,22 @@ policy_routing() {
 					param4="${param4:+$param4 }${nftIPv4Flag} daddr ${negation:+$negation }@${nftPrefix}_${iface}_4_${target}_${type}_${uid}${nftset_suffix}"
 					param6="${param6:+$param6 }${nftIPv6Flag} daddr ${negation:+$negation }@${nftPrefix}_${iface}_6_${target}_${type}_${uid}${nftset_suffix}"
 				else
-					local inline_set_ipv4 inline_set_ipv6
-					inline_set_ipv4="$(inline_set_resolve_ipv4 "$value")"
-					inline_set_ipv6="$(inline_set_resolve_ipv6 "$value")"
-					[ -n "$inline_set_ipv4" ] || inline_set_ipv4_empty_flag='true'
-					[ -n "$inline_set_ipv6" ] || inline_set_ipv6_empty_flag='true'
+					local inline_set_ipv4='' inline_set_ipv6='' d=''
+					unset dest_inline_set_ipv4_empty_flag
+					unset dest_inline_set_ipv6_empty_flag
+					for d in $value; do
+						local resolved_ipv4 resolved_ipv6
+						resolved_ipv4="$(resolveip_to_nftset4 "$d")"
+						resolved_ipv6="$(resolveip_to_nftset6 "$d")"
+						if [ -z "${resolved_ipv4}${resolved_ipv6}" ]; then
+							state add 'errorSummary' 'errorFailedToResolve' "$d"
+						else
+						[ -n "$resolved_ipv4" ] && inline_set_ipv4="${inline_set_ipv4:+$inline_set_ipv4, }$resolved_ipv4"
+						[ -n "$resolved_ipv6" ] && inline_set_ipv6="${inline_set_ipv6:+$inline_set_ipv6, }$resolved_ipv6"
+						fi
+					done
+					[ -n "$inline_set_ipv4" ] || dest_inline_set_ipv4_empty_flag='true'
+					[ -n "$inline_set_ipv6" ] || dest_inline_set_ipv6_empty_flag='true'
 					param4="${param4:+$param4 }${nftIPv4Flag} daddr ${negation:+$negation }{ $inline_set_ipv4 }"
 					param6="${param6:+$param6 }${nftIPv6Flag} daddr ${negation:+$negation }{ $inline_set_ipv6 }"
 				fi
@@ -1517,14 +1531,15 @@ policy_routing() {
 			param4="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} $param4 $dest4 comment \"$name\""
 			param6="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} $param6 $dest6 comment \"$name\""
 			local ipv4_error='0' ipv6_error='0'
-			if [ "$policy_routing_nft_prev_param4" != "$param4" ] && [ -z "$inline_set_ipv4_empty_flag" ] && \
+			if [ "$policy_routing_nft_prev_param4" != "$param4" ] && \
+				[ -z "$src_inline_set_ipv4_empty_flag" ] && [ -z "$dest_inline_set_ipv4_empty_flag" ] && \
 				[ "$filter_group_src_addr" != 'ipv6' ] && [ "$filter_group_src_addr" != 'ipv6_negative' ] && \
 				[ "$filter_group_dest_addr" != 'ipv6' ] && [ "$filter_group_dest_addr" != 'ipv6_negative' ]; then
 					nft4 "$param4" || ipv4_error='1'
 					policy_routing_nft_prev_param4="$param4"
 			fi
-			if [ "$policy_routing_nft_prev_param6" != "$param6" ] && \
-				[ "$param4" != "$param6" ] && [ -z "$inline_set_ipv6_empty_flag" ]&& \
+			if [ "$policy_routing_nft_prev_param6" != "$param6" ] && [ "$param4" != "$param6" ] && \
+				[ -z "$src_inline_set_ipv6_empty_flag" ] && [ -z "$dest_inline_set_ipv6_empty_flag" ] && \
 				[ "$filter_group_src_addr" != 'ipv4' ] && [ "$filter_group_src_addr" != 'ipv4_negative' ] && \
 				[ "$filter_group_dest_addr" != 'ipv4' ] && [ "$filter_group_dest_addr" != 'ipv4_negative' ]; then
 					nft6 "$param6" || ipv6_error='1'
