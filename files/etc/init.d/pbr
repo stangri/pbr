@@ -54,7 +54,7 @@ fw_mask=
 icmp_interface=
 ignored_interface=
 ipv6_enabled=
-nft_file_support=
+nft_file_support='1'
 nft_user_set_policy=
 nft_user_set_counter=
 procd_boot_delay=
@@ -567,7 +567,6 @@ load_package_config() {
 	config_get      icmp_interface            'config' 'icmp_interface'
 	config_get      ignored_interface         'config' 'ignored_interface'
 	config_get_bool ipv6_enabled              'config' 'ipv6_enabled' '0'
-	config_get_bool nft_file_support          'config' 'nft_file_support' '1'
 	config_get_bool nft_rule_counter          'config' 'nft_rule_counter' '0'
 	config_get_bool nft_set_auto_merge        'config' 'nft_set_auto_merge' '1'
 	config_get_bool nft_set_counter           'config' 'nft_set_counter' '0'
@@ -2441,7 +2440,6 @@ load_validate_config() {
 		'procd_wan6_interface:network:wan6' \
 		'wan_ip_rules_priority:uinteger:30000' \
 		'webui_supported_protocol:list(string)' \
-		'nft_file_support:bool:1'\
 		'nft_rule_counter:bool:0'\
 		'nft_set_auto_merge:bool:1'\
 		'nft_set_counter:bool:0'\
