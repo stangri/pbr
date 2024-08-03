@@ -1331,7 +1331,8 @@ policy_routing() {
 	chain="${chain:-prerouting}"
 	mark=$(eval echo "\$mark_${iface//-/_}")
 
-	if [ -z "$ipv6_enabled" ] && { is_ipv6 "$src_addr" || is_ipv6 "$dest_addr"; }; then
+	if [ -z "$ipv6_enabled" ] && \
+		{ is_ipv6 "$(str_first_word "$src_addr")" || is_ipv6 "$(str_first_word "$dest_addr")"; }; then
 		processPolicyError='true'
 		state add 'errorSummary' 'errorPolicyProcessNoIpv6' "$name"
 		return 1
