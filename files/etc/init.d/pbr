@@ -430,7 +430,7 @@ check_dnsmasq_nftset() {
 print_json_bool() { json_init; json_add_boolean "$1" "$2"; json_dump; json_cleanup; }
 print_json_string() { json_init; json_add_string "$1" "$2"; json_dump; json_cleanup; }
 try() {
-	if ! "$@"; then
+	if ! "$@" >/dev/null 2>&1; then
 		state add 'errorSummary' 'errorTryFailed' "$*"
 		return 1
 	fi
