@@ -5,7 +5,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=pbr
 PKG_VERSION:=1.1.7
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_LICENSE:=AGPL-3.0-or-later
 PKG_MAINTAINER:=Stan Grishin <stangri@melmac.ca>
 
@@ -182,4 +182,4 @@ define Package/pbr-netifd/postrm
 endef
 
 $(eval $(call BuildPackage,pbr))
-#$(eval $(call BuildPackage,pbr-netifd))
+$(eval $(call BuildPackage,pbr-netifd))
