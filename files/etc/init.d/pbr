@@ -14,7 +14,7 @@ USE_PROCD=1
 
 readonly packageName='pbr'
 readonly PKG_VERSION='dev-test'
-readonly packageCompat='6'
+readonly packageCompat='7'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageLockFile="/var/run/${packageName}.lock"
@@ -53,7 +53,6 @@ fw_mask=
 icmp_interface=
 ignored_interface=
 ipv6_enabled=
-nft_file_support='1'
 nft_user_set_policy=
 nft_user_set_counter=
 procd_boot_delay=
@@ -293,6 +292,7 @@ inline_set() {
 # shellcheck disable=SC2016
 is_bad_user_file_nft_call() { grep -q '"\$nft" list' "$1" || grep '"\$nft" -f' "$1";}
 is_config_enabled() {
+# shellcheck disable=SC2317
 	_check_config() { local en; config_get_bool en "$1" 'enabled' '1'; [ "$en" -gt '0' ] && _cfg_enabled=0; }
 	local cfg="$1" _cfg_enabled=1
 	[ -n "$1" ] || return 1
@@ -300,6 +300,7 @@ is_config_enabled() {
 	config_foreach _check_config "$cfg"
 	return "$_cfg_enabled"
 }
+# shellcheck disable=SC2317
 uci_get_device() { uci_get 'network' "$1" 'device' || uci_get 'network' "$1" 'dev'; }
 uci_get_protocol() { uci_get 'network' "$1" 'proto'; }
 is_default_dev() { [ "$1" = "$(ip -4 r | grep -m1 'dev' | grep -Eso 'dev [^ ]*' | awk '{print $2}')" ]; }
@@ -496,6 +497,7 @@ get_text() {
 		errorDownloadUrl) r="Failed to download '%s'!";;
 		errorNoDownloadWithSecureReload) r="Policy '%s' refers to URL which can't be downloaded in 'secure_reload' mode!";;
 		errorFileSchemaRequiresCurl) r="The file:// schema requires curl, but it's not detected on this system!";;
+		errorIncompatibleUserFile) r="Incompatible custom user file detected '%s'!";;
 		warningInvalidOVPNConfig) r="Invalid OpenVPN config for '%s' interface.";;
 		warningResolverNotSupported) r="Resolver set (${resolver_set}) is not supported on this system.";;
 		warningPolicyProcessCMD) r="'%s'";;
@@ -504,7 +506,7 @@ get_text() {
 		warningTorUnsetChainNft) r="Please unset 'chain' or set 'chain' to 'prerouting' for policy '%s'.";;
 		warningOutdatedWebUIApp) r="The WebUI application is outdated (version %s), please update it.";;
 		warningBadNftCallsInUserFile) r="Incompatible nft calls detected in user include file, disabling fw4 nft file support.";;
-		warningDnsmasqInstanceNoConfdir) r="Dnsmasq instance (%s) targeted in settings, but it doesn't have its own confdir.";;
+		warningDnsmasqInstanceNoConfdir) r="Dnsmasq instance '%s' targeted in settings, but it doesn't have its own confdir.";;
 	esac
 	echo "$r"
 }
@@ -533,7 +535,7 @@ process_url() {
 		unset dl_https_supported
 	fi
 	while [ -z "$dl_temp_file" ] || [ -e "$dl_temp_file" ]; do
-		dl_temp_file="$(mktemp -u -q -t ${packageName}_tmp.XXXXXXXX)"
+		dl_temp_file="$(mktemp -u -q -t "${packageName}_tmp.XXXXXXXX")"
 	done
 	if is_url_file "$url" && ! is_present 'curl'; then
 		state add 'errorSummary' 'errorFileSchemaRequiresCurl' "$url"
@@ -548,16 +550,6 @@ process_url() {
 }
 
 load_package_config() {
-	_check_user_files_for_bad_nft_calls() {
-		local cfg="$1"
-		local en path
-		config_get_bool en   "$cfg" 'enabled' '1'
-		config_get      path "$cfg" 'path'
-		[ "$en" -eq '0' ] && return 0
-		[ -z "$path" ] && return 0
-		[ -s "$path" ] || return 0
-		is_bad_user_file_nft_call "$path" && user_file_check_result='bad'
-	}
 	local param="$1"
 	local user_file_check_result i
 	config_load "$packageName"
@@ -592,10 +584,7 @@ load_package_config() {
 		[ -s "${agh%/*}/AdGuardHome.yaml" ] && aghConfigFile="${agh%/*}/AdGuardHome.yaml"
 	fi
 	[ -n "$ipv6_enabled" ] && [ "$ipv6_enabled" -eq '0' ] && unset ipv6_enabled
-	[ -n "$nft_file_support" ] && [ "$nft_file_support" -eq '0' ] && unset nft_file_support
 	[ -n "$nft_user_set_counter" ] && [ "$nft_user_set_counter" -eq '0' ] && unset nft_user_set_counter
-	config_foreach _check_user_files_for_bad_nft_calls 'include'
-	[ -n "$user_file_check_result" ] && unset nft_file_support
 	fw_maskXor="$(printf '%#x' "$((fw_mask ^ 0xffffffff))")"
 	fw_maskXor="${fw_maskXor:-0xff00ffff}"
 
@@ -664,7 +653,9 @@ load_environment() {
 }
 
 load_network() {
+# shellcheck disable=SC2317
 	_build_ifaces_supported() { is_supported_interface "$1" && ! str_contains "$ifacesSupported" "$1" && ifacesSupported="${ifacesSupported}${1} "; }
+# shellcheck disable=SC2317
 	_find_firewall_wan_zone() { [ "$(uci_get 'firewall' "$1" 'name')" = "wan" ] && firewallWanZone="$1"; }
 	local i param="$1"
 	local dev4 dev6
@@ -731,7 +722,6 @@ nft_file() {
 	[ -x "$nft" ] || return 1
 	case "$1" in
 		add|add_command)
-			[ -n "$nft_file_support" ] || return 1
 			shift
 			grep -q "$*" "$nftTempFile" || echo "$*" >> "$nftTempFile"
 		;;
@@ -740,20 +730,18 @@ nft_file() {
 			for i in "$nftTempFile" "$nftPermFile"; do 
 				mkdir -p "${i%/*}"
 			done
-			[ -n "$nft_file_support" ] || return 1
 			{ echo '#!/usr/sbin/nft -f'; echo ''; } > "$nftTempFile"
 		;;
 		delete|rm|remove)
 			rm -f "$nftTempFile" "$nftPermFile"
 		;;
 		enabled)
-			[ -n "$nft_file_support" ] && return 0 || return 1
+			return 0
 		;;
 		exists)
 			[ -s "$nftPermFile" ] && return 0 || return 1
 		;;
 		install)
-			[ -n "$nft_file_support" ] || return 1
 			[ -s "$nftTempFile" ] || return 1
 			output "Installing fw4 nft file "
 			if nft_call -c -f "$nftTempFile" && \
@@ -895,7 +883,7 @@ nftset() {
 cleanup_rt_tables() { 
 	local i
 # shellcheck disable=SC2013
-	for i in $(grep -oh "${ipTablePrefix}_.*" $rtTablesFile); do
+	for i in $(grep -oh "${ipTablePrefix}_.*" "$rtTablesFile"); do
 		! is_netifd_table "$i" && sed -i "/${i}/d" "$rtTablesFile"
 	done
 	sync
@@ -2014,6 +2002,11 @@ user_file_process() {
 		output_fail
 		return 1
 	fi
+	if ! is_bad_user_file_nft_call "$path"; then
+		state add 'errorSummary' 'errorIncompatibleUserFile' "$path"
+		output_fail
+		return 1
+	fi
 	output 2 "Running $path "
 # shellcheck disable=SC1090
 	if ! . "$path"; then
@@ -2226,9 +2219,9 @@ service_triggers() {
 	procd_close_validate
 	procd_open_trigger
 		procd_add_config_trigger "config.change" 'openvpn' "/etc/init.d/${packageName}" reload 'on_openvpn_change'
-		procd_add_config_trigger "config.change" "${packageName}" /etc/init.d/${packageName} reload
+		procd_add_config_trigger "config.change" "${packageName}" "/etc/init.d/${packageName}" reload
 		for n in $ifacesSupported; do 
-			procd_add_interface_trigger "interface.*" "$n" /etc/init.d/${packageName} on_interface_reload "$n"
+			procd_add_interface_trigger "interface.*" "$n" "/etc/init.d/${packageName}" on_interface_reload "$n"
 		done
 	procd_close_trigger
 #	procd_add_raw_trigger "interface.*.up" 4000 "/etc/init.d/${packageName}" restart 'on_interface_up'
@@ -2326,9 +2319,9 @@ status_service() {
 #	echo "$_SEPARATOR_"
 #	ip rule list | grep "${packageName}_"
 	echo "$_SEPARATOR_"
-	tableCount="$(grep -c "${packageName}_" $rtTablesFile)" || tableCount=0
+	tableCount="$(grep -c "${packageName}_" "$rtTablesFile")" || tableCount=0
 	wan_tid=$(($(get_rt_tables_next_id)-tableCount))
-	i=0; while [ "$i" -lt "$tableCount" ]; do 
+	i=0; while [ "$i" -lt "$tableCount" ]; do
 		echo "IPv4 table $((wan_tid + i)) route: $(ip -4 route show table $((wan_tid + i)) | grep default)"
 		echo "IPv4 table $((wan_tid + i)) rule(s):"
 		ip -4 rule list table "$((wan_tid + i))"
