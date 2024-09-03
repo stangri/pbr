@@ -2002,7 +2002,7 @@ user_file_process() {
 		output_fail
 		return 1
 	fi
-	if ! is_bad_user_file_nft_call "$path"; then
+	if is_bad_user_file_nft_call "$path"; then
 		state add 'errorSummary' 'errorIncompatibleUserFile' "$path"
 		output_fail
 		return 1
