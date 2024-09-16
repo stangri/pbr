@@ -465,7 +465,7 @@ get_text() {
 		errorResolverNotSupported) r="Resolver set (${resolver_set}) is not supported on this system!";;
 		errorServiceDisabled) r="The ${packageName} service is currently disabled!";;
 		errorNoWanGateway) r="The ${serviceName} service failed to discover WAN gateway!";;
-		errorNoWanInterface) r="The %s inteface not found, you need to set the 'pbr.config.procd_wan_interface' option!";;
+		errorNoWanInterface) r="The %s interface not found, you need to set the 'pbr.config.procd_wan_interface' option!";;
 		errorNoWanInterfaceHint) r="Refer to https://docs.openwrt.melmac.net/pbr/#procd_wan_interface.";;
 		errorNftsetNameTooLong) r="The nft set name '%s' is longer than allowed 255 characters!";;
 		errorUnexpectedExit) r="Unexpected exit or service termination: '%s'!";;
