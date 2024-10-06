@@ -1199,8 +1199,8 @@ dns_policy_routing() {
 		unset param4
 		unset param6
 
-		dest4="dport 53 counter dnat ip to ${dest_dns_ipv4}:53"
-		dest6="dport 53 counter dnat ip6 to ${dest_dns_ipv6}:53"
+		dest4="dport 53 dnat ip to ${dest_dns_ipv4}:53"
+		dest6="dport 53 dnat ip6 to ${dest_dns_ipv6}:53"
 
 		if [ -n "$src_addr" ]; then
 			if [ "${src_addr:0:1}" = "!" ]; then
@@ -1239,8 +1239,8 @@ dns_policy_routing() {
 			fi
 		fi
 
-		param4="$nftInsertOption rule inet ${nftTable} ${nftPrefix}_${chain} ${param4} meta nfproto ipv4 ${proto_i} ${nft_rule_params} ${dest4} comment \"$name\""
-		param6="$nftInsertOption rule inet ${nftTable} ${nftPrefix}_${chain} ${param6} meta nfproto ipv6 ${proto_i} ${nft_rule_params} ${dest6} comment \"$name\""
+		param4="$nftInsertOption rule inet ${nftTable} ${nftPrefix}_${chain} ${param4} ${nft_rule_params} meta nfproto ipv4 ${proto_i} ${dest4} comment \"$name\""
+		param6="$nftInsertOption rule inet ${nftTable} ${nftPrefix}_${chain} ${param6} ${nft_rule_params} meta nfproto ipv6 ${proto_i} ${dest6} comment \"$name\""
 
 		local ipv4_error='0' ipv6_error='0'
 		if [ "$policy_routing_nft_prev_param4" != "$param4" ] && \
@@ -1442,13 +1442,13 @@ policy_routing() {
 			local ipv4_error='0' ipv6_error='0'
 			local dest_i dest4 dest6
 			chain='dstnat'
-			param4="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} meta nfproto ipv4 $param4"
-			param6="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} meta nfproto ipv6 $param6"
-			dest_udp_53="udp dport 53 counter redirect to :${torDnsPort} comment 'Tor-DNS-UDP'"
-			dest_tcp_80="tcp dport 80 counter redirect to :${torTrafficPort} comment 'Tor-HTTP-TCP'"
-			dest_udp_80="udp dport 80 counter redirect to :${torTrafficPort} comment 'Tor-HTTP-UDP'"
-			dest_tcp_443="tcp dport 443 counter redirect to :${torTrafficPort} comment 'Tor-HTTPS-TCP'"
-			dest_udp_443="udp dport 443 counter redirect to :${torTrafficPort} comment 'Tor-HTTPS-UDP'"
+			param4="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} ${nft_rule_params} meta nfproto ipv4 $param4"
+			param6="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} ${nft_rule_params} meta nfproto ipv6 $param6"
+			dest_udp_53="udp dport 53 redirect to :${torDnsPort} comment 'Tor-DNS-UDP'"
+			dest_tcp_80="tcp dport 80 redirect to :${torTrafficPort} comment 'Tor-HTTP-TCP'"
+			dest_udp_80="udp dport 80 redirect to :${torTrafficPort} comment 'Tor-HTTP-UDP'"
+			dest_tcp_443="tcp dport 443 redirect to :${torTrafficPort} comment 'Tor-HTTPS-TCP'"
+			dest_udp_443="udp dport 443 redirect to :${torTrafficPort} comment 'Tor-HTTPS-UDP'"
 			for dest_i in dest_udp_53 dest_tcp_80 dest_udp_80 dest_tcp_443 dest_udp_443; do
 				eval "dest4=\$$dest_i"
 				eval "dest6=\$$dest_i"
