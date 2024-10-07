@@ -142,13 +142,7 @@ quiet_mode() {
 }
 output() {
 # Target verbosity level with the first parameter being an integer
-	is_integer() {
-		case "$1" in
-			(*[!0123456789]*) return 1;;
-			('')              return 1;;
-			(*)               return 0;;
-		esac
-	}
+	is_integer() { case "$1" in ''|*[!0-9]*) return 1;; esac; }
 	local msg memmsg logmsg text
 	local sharedMemoryOutput="/dev/shm/$packageName-output"
 	if [ -z "$verbosity" ] && [ -n "$packageName" ]; then
@@ -313,13 +307,7 @@ is_greater() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
 is_greater_or_equal() { test "$(printf '%s\n' "$@" | sort -V | head -n '1')" = "$2"; }
 is_ignored_interface() { str_contains_word "$ignored_interface" "$1"; }
 is_ignore_target() { [ "$(str_to_lower "$1")" = 'ignore' ]; }
-is_integer() {
-	case "$1" in
-		(*[!0123456789]*) return 1;;
-		('')              return 1;;
-		(*)               return 0;;
-	esac
-}
+is_integer() { case "$1" in ''|*[!0-9]*) return 1;; esac; }
 is_ipv4() { expr "$1" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' >/dev/null; }
 is_ipv6() { ! is_mac_address "$1" && str_contains "$1" ':'; }
 is_ipv6_global() { [ "${1:0:4}" = '2001' ]; }
