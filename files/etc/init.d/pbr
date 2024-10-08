@@ -702,14 +702,14 @@ load_network() {
 
 is_wan_up() {
 	local sleepCount='1' param="$1"
-	[ "$procd_wan_ignore_status" -eq '0' ] || return 0
+	[ "$procd_wan_ignore_status" -eq '1' ] && return 0
 	[ "$param" = 'on_boot' ] || procd_boot_timeout='1'
 	if [ -z "$(uci_get network "$procd_wan_interface")" ]; then
 		state add 'errorSummary' 'errorNoWanInterface' "$procd_wan_interface"
 		state add 'errorSummary' 'errorNoWanInterfaceHint'
 		return 1
 	fi
-	while [ -z "$wanGW" ] ; do
+	while [ -z "$wanGW" ]; do
 		load_network "$param"
 		if [ "$((sleepCount))" -gt "$((procd_boot_timeout))" ] || [ -n "$wanGW" ]; then break; fi
 		output "$serviceName waiting for $procd_wan_interface gateway...\\n"
@@ -2068,7 +2068,7 @@ start_service() {
 	local resolverStoredHash resolverNewHash i param="$1" reloadedIface
 
 	load_environment "${param:-on_start}" "$(load_validate_config)" || return 1
-	is_wan_up "$param" || return 1
+#	is_wan_up "$param" || return 1
 
 	process_interface 'all' 'prepare'
 	config_foreach process_interface 'interface' 'pre_init'
