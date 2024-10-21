@@ -113,12 +113,12 @@ torTrafficPort=
 # shellcheck disable=SC1091
 . /usr/share/libubox/jshn.sh
 
-output_ok() { output 1 "$_OK_"; output 2 "$__OK__\\n"; }
-output_okn() { output 1 "$_OK_\\n"; output 2 "$__OK__\\n"; }
-output_okb() { output 1 "$_OKB_"; output 2 "$__OKB__\\n"; }
-output_okbn() { output 1 "$_OKB_\\n"; output 2 "$__OKB__\\n"; }
-output_fail() { output 1 "$_FAIL_"; output 2 "$__FAIL__\\n"; }
-output_failn() { output 1 "$_FAIL_\\n"; output 2 "$__FAIL__\\n"; }
+output_ok() { output 1 "$_OK_"; output 2 "$__OK__\n"; }
+output_okn() { output 1 "$_OK_\n"; output 2 "$__OK__\n"; }
+output_okb() { output 1 "$_OKB_"; output 2 "$__OKB__\n"; }
+output_okbn() { output 1 "$_OKB_\n"; output 2 "$__OKB__\n"; }
+output_fail() { output 1 "$_FAIL_"; output 2 "$__FAIL__\n"; }
+output_failn() { output 1 "$_FAIL_\n"; output 2 "$__FAIL__\n"; }
 str_contains() { [ -n "$1" ] && [ -n "$2" ] && [ "${1//$2}" != "$1" ]; }
 str_contains_word() { echo "$1" | grep -q -w "$2"; }
 str_extras_to_underscore() { echo "$1" | tr '[\. ~`!@#$%^&*()\+/,<>?//;:]' '_'; }
@@ -644,27 +644,27 @@ load_environment() {
 			output 1 "Loading environment ($param) "
 			load_package_config "$param"
 			if [ "$enabled" -eq '0' ]; then
-				output 1 "$_FAIL_\\n"
+				output 1 "$_FAIL_\n"
 				state add 'errorSummary' 'errorServiceDisabled'
 				return 1
 			fi
 			if [ -n "$validation_result" ] && [ "$validation_result" != '0' ]; then
-				output 1 "$_FAIL_\\n"
-				output "${_ERROR_}: The $packageName config validation failed!\\n"
-				output "Please check if the '$packageConfigFile' contains correct values for config options.\\n"
+				output 1 "$_FAIL_\n"
+				output "${_ERROR_}: The $packageName config validation failed!\n"
+				output "Please check if the '$packageConfigFile' contains correct values for config options.\n"
 				state add 'errorSummary' 'errorConfigValidation'
 				return 1
 			fi
-			_system_health_check || { output 1 "$_FAIL_\\n"; return 1; }
+			_system_health_check || { output 1 "$_FAIL_\n"; return 1; }
 			resolver 'check_support' && resolver 'configure_instances'
 			load_network "$param"
-			output 1 "$_OK_\\n"
+			output 1 "$_OK_\n"
 		;;
 		on_stop)
 			output 1 "Loading environment ($param) "
 			load_package_config "$param"
 			load_network "$param"
-			output 1 "$_OK_\\n"
+			output 1 "$_OK_\n"
 		;;
 		on_triggers|*)
 			load_package_config "$param"
@@ -702,10 +702,10 @@ load_network() {
 
 	case "$param" in
 		on_boot|on_start)
-			[ -n "$wanIface4" ] && output 2 "Using wan interface (${param}): $wanIface4 \\n"
-			[ -n "$wanGW4" ] && output 2 "Found wan gateway (${param}): $wanGW4 \\n"
-			[ -n "$wanIface6" ] && output 2 "Using wan6 interface (${param}): $wanIface6 \\n"
-			[ -n "$wanGW6" ] && output 2 "Found wan6 gateway (${param}): $wanGW6 \\n"
+			[ -n "$wanIface4" ] && output 2 "Using wan interface (${param}): $wanIface4 \n"
+			[ -n "$wanGW4" ] && output 2 "Found wan gateway (${param}): $wanGW4 \n"
+			[ -n "$wanIface6" ] && output 2 "Using wan6 interface (${param}): $wanIface6 \n"
+			[ -n "$wanGW6" ] && output 2 "Found wan6 gateway (${param}): $wanGW6 \n"
 		;;
 	esac
 	wanGW="${wanGW4:-$wanGW6}"
@@ -723,7 +723,7 @@ is_wan_up() {
 	while [ -z "$wanGW" ]; do
 		load_network "$param"
 		if [ "$((sleepCount))" -gt "$((procd_boot_timeout))" ] || [ -n "$wanGW" ]; then break; fi
-		output "$serviceName waiting for $procd_wan_interface gateway...\\n"
+		output "$serviceName waiting for $procd_wan_interface gateway...\n"
 		sleep 1
 		network_flush_cache
 		sleepCount=$((sleepCount+1))
@@ -985,10 +985,10 @@ EOF
 					if str_contains "$line" ' '; then
 						error_id="${line% *}"
 						error_extra="${line#* }"
-						printf "%b $(get_text "$error_id")\\n" "$label" "$error_extra"
+						printf "%b $(get_text "$error_id")\n" "$label" "$error_extra"
 					else
 						error_id="$line"
-						printf "%b $(get_text "$error_id")\\n" "$label"
+						printf "%b $(get_text "$error_id")\n" "$label"
 					fi
 				done <<EOF
 $(eval echo "\$$param" | tr \# \\n)
@@ -1443,11 +1443,11 @@ policy_routing() {
 			chain='dstnat'
 			param4="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} ${nft_rule_params} meta nfproto ipv4 $param4"
 			param6="$nftInsertOption rule inet $nftTable ${nftPrefix}_${chain} ${nft_rule_params} meta nfproto ipv6 $param6"
-			dest_udp_53="udp dport 53 redirect to :${torDnsPort} comment 'Tor-DNS-UDP'"
-			dest_tcp_80="tcp dport 80 redirect to :${torTrafficPort} comment 'Tor-HTTP-TCP'"
-			dest_udp_80="udp dport 80 redirect to :${torTrafficPort} comment 'Tor-HTTP-UDP'"
-			dest_tcp_443="tcp dport 443 redirect to :${torTrafficPort} comment 'Tor-HTTPS-TCP'"
-			dest_udp_443="udp dport 443 redirect to :${torTrafficPort} comment 'Tor-HTTPS-UDP'"
+			dest_udp_53="udp dport 53 redirect to :${torDnsPort} comment \"Tor-DNS-UDP\""
+			dest_tcp_80="tcp dport 80 redirect to :${torTrafficPort} comment \"Tor-HTTP-TCP\""
+			dest_udp_80="udp dport 80 redirect to :${torTrafficPort} comment \"Tor-HTTP-UDP\""
+			dest_tcp_443="tcp dport 443 redirect to :${torTrafficPort} comment \"Tor-HTTPS-TCP\""
+			dest_udp_443="udp dport 443 redirect to :${torTrafficPort} comment \"Tor-HTTPS-UDP\""
 			for dest_i in dest_udp_53 dest_tcp_80 dest_udp_80 dest_tcp_443 dest_udp_443; do
 				eval "dest4=\$$dest_i"
 				eval "dest6=\$$dest_i"
@@ -1835,7 +1835,7 @@ process_interface() {
 				torDnsPort="$(get_tor_dns_port)"
 				torTrafficPort="$(get_tor_traffic_port)"
 				displayText="${iface}/53->${torDnsPort}/80,443->${torTrafficPort}"
-				gatewaySummary="${gatewaySummary}${displayText}\\n"
+				gatewaySummary="${gatewaySummary}${displayText}\n"
 				;;
 			destroy)
 				;;
@@ -1917,7 +1917,7 @@ process_interface() {
 			output 2 "Setting up routing for '$displayText' "
 			if interface_routing 'create' "$ifaceTableID" "$ifaceMark" "$iface" "$gw4" "$dev" "$gw6" "$dev6" "$ifacePriority"; then
 				json_add_gateway 'create' "$ifaceTableID" "$ifaceMark" "$iface" "$gw4" "$dev" "$gw6" "$dev6" "$ifacePriority" "$dispStatus"
-				gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\\n"
+				gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\n"
 				if is_netifd_table_interface "$iface"; then output_okb; else output_ok; fi
 			else
 				state add 'errorSummary' 'errorFailedSetup' "$displayText"
@@ -1973,7 +1973,7 @@ process_interface() {
 				[ "$verbosity" = '1' ] && dispStatus="$_OK_" || dispStatus="$__OK__"
 			fi
 			displayText="${iface}/${dispDev:+$dispDev/}${dispGw4}${ipv6_enabled:+/$dispGw6}"
-			gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\\n"
+			gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\n"
 		;;
 		reload_interface)
 			ifaceTableID="$(get_rt_tables_id "$iface")"
@@ -1993,14 +1993,14 @@ process_interface() {
 				output 2 "Reloading routing for '$displayText' "
 				if interface_routing 'reload_interface' "$ifaceTableID" "$ifaceMark" "$iface" "$gw4" "$dev" "$gw6" "$dev6" "$ifacePriority"; then
 					json_add_gateway 'reload_interface' "$ifaceTableID" "$ifaceMark" "$iface" "$gw4" "$dev" "$gw6" "$dev6" "$ifacePriority" "$dispStatus"
-					gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\\n"
+					gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\n"
 					if is_netifd_table_interface "$iface"; then output_okb; else output_ok; fi
 				else
 					state add 'errorSummary' 'errorFailedReload' "$displayText"
 					output_fail
 				fi
 			else
-				gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\\n"
+				gatewaySummary="${gatewaySummary}${displayText}${dispStatus:+ $dispStatus}\n"
 			fi
 		;;
 	esac
@@ -2214,13 +2214,13 @@ service_started() {
 	if nft_file 'exists'; then
 		procd_set_config_changed firewall
 		if nft_file 'exists'; then
-			[ -n "$gatewaySummary" ] && output "$serviceName (fw4 nft file mode) started with gateways:\\n${gatewaySummary}"
+			[ -n "$gatewaySummary" ] && output "$serviceName (fw4 nft file mode) started with gateways:\n${gatewaySummary}"
 		else
 			output "$serviceName FAILED TO START in fw4 nft file mode!!!"
 			output "Check the output of nft -c -f $nftTempFile"
 		fi
 	else
-		[ -n "$gatewaySummary" ] && output "$serviceName (nft mode) started with gateways:\\n${gatewaySummary}"
+		[ -n "$gatewaySummary" ] && output "$serviceName (nft mode) started with gateways:\n${gatewaySummary}"
 	fi
 	state print 'errorSummary'
 	state print 'warningSummary'
@@ -2253,7 +2253,7 @@ service_triggers() {
 	procd_close_trigger
 #	procd_add_raw_trigger "interface.*.up" 4000 "/etc/init.d/${packageName}" restart 'on_interface_up'
 	if [ "$serviceStartTrigger" = 'on_start' ]; then
-		output 3 "$serviceName monitoring interfaces: ${ifacesSupported}\\n"
+		output 3 "$serviceName monitoring interfaces: ${ifacesSupported}\n"
 	fi
 }
 
@@ -2277,7 +2277,7 @@ stop_service() {
 	config_foreach process_interface 'interface' 'destroy'
 	process_interface 'tor' 'destroy'
 	cleanup_rt_tables
-	output 1 "\\n"
+	output 1 "\n"
 	ip route flush cache
 	unset ifaceMark
 	unset ifaceTableID
