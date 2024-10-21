@@ -188,90 +188,13 @@ pbr_get_gateway6() {
 	fi
 	eval "$1"='$gw'
 }
-filter_options() {
-	local opt="$1" value="$2"
-	local i _ret=
-
-	case "$opt" in
-		phys_dev)
-			for i in $value; do
-				if is_phys_dev "$i"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		phys_dev_negative)
-			for i in $value; do
-				if is_negation "$i" && is_phys_dev "${i:1}"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		mac_address)
-			for i in $value; do
-				if is_mac_address "$i"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		mac_address_negative)
-			for i in $value; do
-				if is_negation "$i" && is_mac_address "${i:1}"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		domain)
-			for i in $value; do
-				if is_domain "$i"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		domain_negative)
-			for i in $value; do
-				if is_negation "$i" && is_domain "${i:1}"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		ipv4)
-			for i in $value; do
-				if is_ipv4 "$i" || is_ipv4_netmask "$i"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		ipv4_negative)
-			for i in $value; do
-				if is_negation "$i" && { is_ipv4 "${i:1}" || is_ipv4_netmask "${i:1}"; }; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		ipv6)
-			for i in $value; do
-				if is_ipv6 "$i"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		ipv6_negative)
-			for i in $value; do
-				if is_negation "$i" && is_ipv6 "${i:1}"; then
-					_ret="${_ret:+$_ret }$i"
-				fi
-			done
-		;;
-		none)
-			:
-		;;
-		*)
-			echo ''
-			return 1
-		;;
-	esac
-
+filter_options(){
+	local opt="$1" values="$2" v _ret
+	for v in $values; do
+		case "$opt" in *_negative) is_negation "$v" || continue;;esac
+		eval is_$opt "${v#!}" || continue
+		_ret="${_ret:+$_ret }$v"
+	done
 	echo "$_ret"
 	return 0
 }
@@ -302,19 +225,18 @@ is_default_dev() { [ "$1" = "$(ip -4 r | grep -m1 'dev' | grep -Eso 'dev [^ ]*' 
 is_disabled_interface() { [ "$(uci_get 'network' "$1" 'disabled')" = '1' ]; }
 is_domain() { ! is_ipv6 "$1" && ! is_mac_address "$1" && ! is_phys_dev "$1" && str_contains "$1" '[a-zA-Z]'; }
 is_dslite() { local p; network_get_protocol p "$1"; [ "${p:0:6}" = "dslite" ]; }
-is_family_mismatch() { ( is_ipv4_netmask "${1//!}" && is_ipv6 "${2//!}" ) || ( is_ipv6 "${1//!}" && is_ipv4_netmask "${2//!}" ); }
+is_family_mismatch() { ( is_ipv4 "${1//!}" && is_ipv6 "${2//!}" ) || ( is_ipv6 "${1//!}" && is_ipv4 "${2//!}" );}
 is_greater() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
 is_greater_or_equal() { test "$(printf '%s\n' "$@" | sort -V | head -n '1')" = "$2"; }
 is_ignored_interface() { str_contains_word "$ignored_interface" "$1"; }
 is_ignore_target() { [ "$(str_to_lower "$1")" = 'ignore' ]; }
 is_integer() { case "$1" in ''|*[!0-9]*) return 1;; esac; }
-is_ipv4() { expr "$1" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' >/dev/null; }
+is_ipv4() { expr "${1%/*}" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' >/dev/null; }
 is_ipv6() { ! is_mac_address "$1" && str_contains "$1" ':'; }
 is_ipv6_global() { [ "${1:0:4}" = '2001' ]; }
 is_ipv6_link_local() { [ "${1:0:4}" = 'fe80' ]; }
 is_ipv6_unique_local() { [ "${1:0:2}" = 'fc' ] || [ "${1:0:2}" = 'fd' ]; }
 is_list() { str_contains "$1" ',' || str_contains "$1" ' '; }
-is_ipv4_netmask() { local ip="${1%/*}"; [ "$ip" != "$1" ] && is_ipv4 "$ip"; }
 is_lan() { local d; network_get_device d "$1"; str_contains "$procd_lan_interface" "$d"; }
 is_l2tp() { local p; network_get_protocol p "$1"; [ "${p:0:4}" = "l2tp" ]; }
 is_mac_address() { expr "$1" : '[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]$' >/dev/null; }
@@ -796,7 +718,7 @@ nftset() {
 			if is_mac_address "$param" || is_list "$param"; then
 				nft4 add element inet "$nftTable" "$nftset4" "{ $param }" && ipv4_error=0
 				nft6 add element inet "$nftTable" "$nftset6" "{ $param }" && ipv6_error=0
-			elif is_ipv4_netmask "$param" || is_ipv4 "$param"; then
+			elif is_ipv4 "$param"; then
 				nft4 add element inet "$nftTable" "$nftset4" "{ $param }" && ipv4_error=0
 			elif is_ipv6 "$param"; then
 				nft6 add element inet "$nftTable" "$nftset6" "{ $param }" && ipv6_error=0
