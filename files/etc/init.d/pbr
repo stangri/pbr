@@ -324,8 +324,7 @@ is_netifd_table_interface() { local iface="$1"; [ "$(uci_get 'network' "$iface" 
 is_oc() { local p; network_get_protocol p "$1"; [ "${p:0:11}" = "openconnect" ]; }
 is_ovpn() { local d; uci_get_device d "$1"; [ "${d:0:3}" = "tun" ] || [ "${d:0:3}" = "tap" ] || [ -f "/sys/devices/virtual/net/${d}/tun_flags" ]; }
 is_ovpn_valid() { local dev_net dev_ovpn; uci_get_device dev_net "$1"; dev_ovpn="$(uci_get 'openvpn' "$1" 'dev')"; [ -n "$dev_net" ] && [ -n "$dev_ovpn" ] && [ "$dev_net" = "$dev_ovpn" ]; }
-is_phys_dev() { [ "${1:0:1}" = "@" ] && ip l show | grep -E -q "^\\d+\\W+${1:1}"; }
-is_phys_dev_quick() { [ "${1:0:1}" = "@" ]; }
+is_phys_dev(){ [ -L "/sys/class/net/${1#@}" ];}
 is_present() { command -v "$1" >/dev/null 2>&1; }
 is_service_running() { is_service_running_nft; }
 is_service_running_nft() { [ -x "$nft" ] && [ -n "$(get_mark_nft_chains)" ]; }
@@ -1209,7 +1208,7 @@ dns_policy_routing() {
 			fi
 			value="$src_addr"
 			first_value="$(str_first_word "$value")"
-			if is_phys_dev_quick "$first_value"; then
+			if is_phys_dev "$first_value"; then
 				param4="${param4:+$param4 }iifname ${negation:+$negation }{ $(inline_set "$value") }"
 				param6="${param6:+$param6 }iifname ${negation:+$negation }{ $(inline_set "$value") }"
 			elif is_mac_address "$first_value"; then
@@ -1343,7 +1342,7 @@ policy_routing() {
 				unset negation; value="$src_addr"; unset nftset_suffix;
 			fi
 			first_value_src="$(str_first_word "$value")"
-			if is_phys_dev_quick "$first_value_src"; then
+			if is_phys_dev "$first_value_src"; then
 				param4="${param4:+$param4 }iifname ${negation:+$negation }{ $(inline_set "$value") }"
 				param6="${param6:+$param6 }iifname ${negation:+$negation }{ $(inline_set "$value") }"
 			elif is_mac_address "$first_value_src"; then
@@ -1381,7 +1380,7 @@ policy_routing() {
 				unset negation; value="$dest_addr"; unset nftset_suffix;
 			fi
 			first_value_dest="$(str_first_word "$value")"
-			if is_phys_dev_quick "$first_value_dest"; then
+			if is_phys_dev "$first_value_dest"; then
 				param4="${param4:+$param4 }oifname ${negation:+$negation }{ $(inline_set "$value") }"
 				param6="${param6:+$param6 }oifname ${negation:+$negation }{ $(inline_set "$value") }"
 			elif is_domain "$first_value_dest"; then
