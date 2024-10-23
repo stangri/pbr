@@ -188,10 +188,10 @@ pbr_get_gateway6() {
 	fi
 	eval "$1"='$gw'
 }
-filter_options(){
+filter_options() {
 	local opt="$1" values="$2" v _ret
 	for v in $values; do
-		case "$opt" in *_negative) is_negation "$v" || continue;;esac
+		str_contains "$opt" _negative && { is_negation "$v" || continue;}
 		eval is_$opt "${v#!}" || continue
 		_ret="${_ret:+$_ret }$v"
 	done
