@@ -322,7 +322,7 @@ is_negation() { [ "${1:0:1}" = '!' ]; }
 is_netifd_table() { grep -q "ip.table.*$1" /etc/config/network; }
 is_netifd_table_interface() { local iface="$1"; [ "$(uci_get 'network' "$iface" 'ip4table')" = "${packageName}_${iface%6}" ]; }
 is_oc() { local p; network_get_protocol p "$1"; [ "${p:0:11}" = "openconnect" ]; }
-is_ovpn() { local d; uci_get_device d "$1"; [ "${d:0:3}" = "tun" ] || [ "${d:0:3}" = "tap" ] || [ -f "/sys/devices/virtual/net/${d}/tun_flags" ]; }
+is_ovpn(){ [ -f "/sys/class/net/$(uci get network.$1.device 2>/dev/null)/tun_flags" ];}
 is_ovpn_valid() { local dev_net dev_ovpn; uci_get_device dev_net "$1"; dev_ovpn="$(uci_get 'openvpn' "$1" 'dev')"; [ -n "$dev_net" ] && [ -n "$dev_ovpn" ] && [ "$dev_net" = "$dev_ovpn" ]; }
 is_phys_dev(){ [ -L "/sys/class/net/${1#@}" ];}
 is_present() { command -v "$1" >/dev/null 2>&1; }
