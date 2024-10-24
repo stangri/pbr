@@ -14,7 +14,7 @@ USE_PROCD=1
 
 readonly packageName='pbr'
 readonly PKG_VERSION='dev-test'
-readonly packageCompat='8'
+readonly packageCompat='9'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageLockFile="/var/run/${packageName}.lock"
@@ -192,7 +192,7 @@ filter_options() {
 	local opt="$1" values="$2" v _ret
 	for v in $values; do
 		str_contains "$opt" _negative && { is_negation "$v" || continue; }
-		eval is_$opt "${v#!}" || continue
+		eval "is_$opt" "${v#!}" || continue
 		_ret="${_ret:+$_ret }$v"
 	done
 	echo "$_ret"
@@ -223,7 +223,7 @@ uci_get_device() { uci_get 'network' "$1" 'device' || uci_get 'network' "$1" 'de
 uci_get_protocol() { uci_get 'network' "$1" 'proto'; }
 is_default_dev() { [ "$1" = "$(ip -4 r | grep -m1 'dev' | grep -Eso 'dev [^ ]*' | awk '{print $2}')" ]; }
 is_disabled_interface() { [ "$(uci_get 'network' "$1" 'disabled')" = '1' ]; }
-is_domain(){ echo "$1" | grep -qE '^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.)*[a-zA-Z]{2,}$';}
+is_domain(){ echo "$1" | grep -qE '^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\.)*[a-zA-Z]{2,}$'; }
 is_dslite() { local p; network_get_protocol p "$1"; [ "${p:0:6}" = "dslite" ]; }
 is_family_mismatch() { ( is_ipv4 "${1//!}" && is_ipv6 "${2//!}" ) || ( is_ipv6 "${1//!}" && is_ipv4 "${2//!}" ); }
 is_greater() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
@@ -413,6 +413,7 @@ get_text() {
 		warningOutdatedWebUIApp) r="The WebUI application is outdated (version %s), please update it.";;
 		warningBadNftCallsInUserFile) r="Incompatible nft calls detected in user include file, disabling fw4 nft file support.";;
 		warningDnsmasqInstanceNoConfdir) r="Dnsmasq instance '%s' targeted in settings, but it doesn't have its own confdir.";;
+		warningDhcpLanForce) r="Please set 'dhcp.lan.force=1' to speed up service start-up.";;
 	esac
 	echo "$r"
 }
@@ -528,30 +529,33 @@ load_package_config() {
 
 load_environment() {
 	_system_health_check() {
-		local i
+		local i _ret=0
 		if [ "$(uci_get 'firewall' 'defaults' 'auto_includes')" = '0' ]; then
 			uci_remove 'firewall' 'defaults' 'auto_includes'
 			uci_commit firewall
+		fi
+		if [ "$(uci_get dhcp lan force 0)" = '0' ]; then
+			state add 'warningSummary' 'warningDhcpLanForce'
 		fi
 		# TODO: implement ip-full check
 		# state add 'errorSummary' 'errorRequiredBinaryMissing' 'ip-full'
 		if ! nft_call list table inet fw4; then
 			state add 'errorSummary' 'errorDefaultFw4TableMissing' 'fw4'
-			return 1
+			_ret='1'
 		fi
 		if is_config_enabled 'dns_policy' || is_tor_running; then
 			if ! nft_call list chain inet fw4 dstnat; then
 				state add 'errorSummary' 'errorDefaultFw4ChainMissing' 'dstnat'
-				return 1
+				_ret='1'
 			fi
 		fi
 		for i in $chainsList; do
 			if ! nft_call list chain inet fw4 "mangle_${i}"; then
 				state add 'errorSummary' 'errorDefaultFw4ChainMissing' "mangle_${i}"
-				return 1
+				_ret='1'
 			fi
 		done
-		return 0
+		return "$_ret"
 	}
 	local param="$1" validation_result="$2"
 	case "$param" in
