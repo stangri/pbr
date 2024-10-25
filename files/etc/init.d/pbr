@@ -422,23 +422,23 @@ get_text() {
 	echo "$r"
 }
 set_dl(){
-	[ -f "$wget" ] && {
-		dl_scheme='ftp http'
+	[ -x "$wget" ] && {
+		dl_schemes='ftp http'
 		dl_command='$wget -q --no-check-certificate'
 		dl_flag='-O'
 	}
-	[ -f "$fetch" ] && {
-		[ -f "$fetchssl" ] && dl_scheme='ftp http https' || dl_scheme='ftp http'
+	[ -x "$fetch" ] && {
+		[ -f "$fetchssl" ] && dl_schemes='ftp http https' || dl_schemes='ftp http'
 		dl_command='$fetch -q --no-check-certificate'
 		dl_flag='-O'
 	}
-	[ -f "$wgetssl" ] && {
-		dl_scheme='ftp http https'
+	[ -x "$wgetssl" ] && {
+		dl_schemes='ftp http https'
 		dl_command='$wgetssl -q --no-check-certificate'
 		dl_flag='-O'
 	}
-	[ -f "$curl" ] && {
-		dl_scheme='ftp http https file'
+	[ -x "$curl" ] && {
+		dl_schemes='ftp http https file'
 		dl_command='$curl --silent --insecure'
 		dl_flag='-o'
 	}
@@ -447,7 +447,7 @@ set_dl(){
 process_url(){
 	[ -n "$dl_command" ] || set_dl || return 1
 	local url="$1" scheme="${1%%://*}"
-	str_contains_word "$dl_scheme" $scheme || {
+	str_contains_word "$dl_schemes" $scheme || {
 		state add 'errorSummary' 'errorDownloadUnsupported' "$url"
 	}
 	$dl_command "$url" "$dl_flag" - | xargs
