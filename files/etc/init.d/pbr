@@ -421,30 +421,30 @@ get_text() {
 	esac
 	echo "$r"
 }
-set_dl(){
+set_dl() {
 	[ -x "$wget" ] && {
 		dl_schemes='ftp http'
-		dl_command='$wget -q --no-check-certificate'
+		dl_command="$wget -q --no-check-certificate"
 		dl_flag='-O'
 	}
 	[ -x "$fetch" ] && {
 		[ -f "$fetchssl" ] && dl_schemes='ftp http https' || dl_schemes='ftp http'
-		dl_command='$fetch -q --no-check-certificate'
+		dl_command="$fetch -q --no-check-certificate"
 		dl_flag='-O'
 	}
 	[ -x "$wgetssl" ] && {
 		dl_schemes='ftp http https'
-		dl_command='$wgetssl -q --no-check-certificate'
+		dl_command="$wgetssl -q --no-check-certificate"
 		dl_flag='-O'
 	}
 	[ -x "$curl" ] && {
 		dl_schemes='ftp http https file'
-		dl_command='$curl --silent --insecure'
+		dl_command="$curl --silent --insecure"
 		dl_flag='-o'
 	}
 	[ -n "$dl_command" ]
 }
-process_url(){
+process_url() {
 	[ -n "$dl_command" ] || set_dl || return 1
 	local url="$1" scheme="${1%%://*}"
 	str_contains_word "$dl_schemes" $scheme || {
