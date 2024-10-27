@@ -219,7 +219,12 @@ is_config_enabled() {
 	return "$_cfg_enabled"
 }
 # shellcheck disable=SC2317
-uci_get_device() { uci_get 'network' "$1" 'device' || uci_get 'network' "$1" 'dev'; }
+uci_get_device() {
+	local __tmp
+	__tmp="$(uci_get 'network' "$2" 'device')"
+	[ -z "$__tmp" ] && unset "$1" && return 1
+	eval "$1=$__tmp"
+}
 uci_get_protocol() { uci_get 'network' "$1" 'proto'; }
 is_default_dev() { [ "$1" = "$(ip -4 r | grep -m1 'dev' | grep -Eso 'dev [^ ]*' | awk '{print $2}')" ]; }
 is_disabled_interface() { [ "$(uci_get 'network' "$1" 'disabled')" = '1' ]; }
