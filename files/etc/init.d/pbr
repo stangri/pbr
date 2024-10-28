@@ -113,12 +113,7 @@ torTrafficPort=
 # shellcheck disable=SC1091
 . /usr/share/libubox/jshn.sh
 
-output_ok() { output 1 "$_OK_"; output 2 "$__OK__\n"; }
-output_okn() { output 1 "$_OK_\n"; output 2 "$__OK__\n"; }
-output_okb() { output 1 "$_OKB_"; output 2 "$__OKB__\n"; }
-output_okbn() { output 1 "$_OKB_\n"; output 2 "$__OKB__\n"; }
-output_fail() { output 1 "$_FAIL_"; output 2 "$__FAIL__\n"; }
-output_failn() { output 1 "$_FAIL_\n"; output 2 "$__FAIL__\n"; }
+debug() { local i j; for i in "$@"; do eval "j=\$$i"; logger "${packageName:+-t $packageName}" "${i}: ${j} "; done; }
 str_contains() { [ -n "$1" ] && [ -n "$2" ] && [ "${1//$2}" != "$1" ]; }
 str_contains_word() { echo "$1" | grep -q -w "$2"; }
 str_extras_to_underscore() { echo "$1" | tr '[\. ~`!@#$%^&*()\+/,<>?//;:]' '_'; }
@@ -133,24 +128,29 @@ str_replace() { echo "${1//$2/$3}"; }
 str_to_dnsmsaq_nftset() { echo "$1" | tr ' ' '/'; }
 str_to_lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 str_to_upper() { echo "$1" | tr 'a-z' 'A-Z'; }
-debug() { local i j; for i in "$@"; do eval "j=\$$i"; logger "${packageName:+-t $packageName}" "${i}: ${j} "; done; }
-quiet_mode() {
-	case "$1" in
-		on) verbosity=0;;
-		off) verbosity="$(uci_get "$packageName" 'config' 'verbosity' '2')";;
-	esac
-}
 output() {
 	local v="${verbosity:-1}"
 	[ "$#" -ne '1' ] && {
 		case "$1" in [0-9]) [ $((v & $1)) -gt 0 ] && shift || return 0;; esac }
 	local msg="$*" queue="/dev/shm/$packageName-output"
 	[ -t 1 ] && printf "%b" "$msg"
-	[ "$(printf "%b" "$msg" | grep -c '^')" -gt '1' ] && {
+	[ "$msg" != "${msg//\\n}" ] && {
 		[ -s "$queue" ] && msg="$(cat "$queue")${msg}" && rm -f "$queue"
 		msg="$(printf "%b" "$msg" | sed 's/\x1b\[[0-9;]*m//g')"
-		logger -t "${packageName:-service} [$$]" "$(printf "%b" "$msg")"
+		logger -t "$packageName [$$]" "$(printf "%b" "$msg")"
 	} || printf "%b" "$msg" >> "$queue"
+}
+output_ok() { output 1 "$_OK_"; output 2 "$__OK__\n"; }
+output_okn() { output 1 "$_OK_\n"; output 2 "$__OK__\n"; }
+output_okb() { output 1 "$_OKB_"; output 2 "$__OKB__\n"; }
+output_okbn() { output 1 "$_OKB_\n"; output 2 "$__OKB__\n"; }
+output_fail() { output 1 "$_FAIL_"; output 2 "$__FAIL__\n"; }
+output_failn() { output 1 "$_FAIL_\n"; output 2 "$__FAIL__\n"; }
+quiet_mode() {
+	case "$1" in
+		on) verbosity=0;;
+		off) verbosity="$(uci_get "$packageName" 'config' 'verbosity' '2')";;
+	esac
 }
 pbr_find_iface() {
 	local iface i param="$2"
