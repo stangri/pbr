@@ -14,7 +14,7 @@ USE_PROCD=1
 
 readonly packageName='pbr'
 readonly PKG_VERSION='dev-test'
-readonly packageCompat='9'
+readonly packageCompat='10'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageLockFile="/var/run/${packageName}.lock"
@@ -411,6 +411,7 @@ get_text() {
 		errorDefaultFw4TableMissing) r="Default fw4 table '%s' is missing!";;
 		errorDefaultFw4ChainMissing) r="Default fw4 chain '%s' is missing!";;
 		errorRequiredBinaryMissing) r="Required binary '%s' is missing!";;
+		errorInterfaceRoutingUnknownDevType) r="Unknown IPv6 Link type for device '%s'!";;
 		warningInvalidOVPNConfig) r="Invalid OpenVPN config for '%s' interface.";;
 		warningResolverNotSupported) r="Resolver set (${resolver_set}) is not supported on this system.";;
 		warningPolicyProcessCMD) r="'%s'";;
@@ -1618,9 +1619,16 @@ EOF
 						if [ -z "$gw6" ] || [ "$gw6" = "::/0" ]; then
 							try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 						elif ip -6 route list table main | grep -q " dev $dev6 "; then
-							if ! ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1; then  
+							if ip -6 address show dev "$dev6" | grep -q "BROADCAST"; then
 								try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+							elif ip -6 address show dev "$dev6" | grep -q "POINTOPOINT"; then
+								try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" || ipv6_error=1
+							else
+								state add 'errorSummary' 'errorInterfaceRoutingUnknownDevType' "$dev6"
 							fi
+#							if ! ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1; then  
+#								try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+#							fi
 							while read -r i; do
 								i="$(echo "$i" | sed 's/ linkdown$//')"
 								i="$(echo "$i" | sed 's/ onlink$//')"
@@ -1694,8 +1702,12 @@ EOF
 					if [ -z "$gw6" ] || [ "$gw6" = "::/0" ]; then
 						try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 					elif ip -6 route list table main | grep -q " dev $dev6 "; then
-						if ! ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1; then  
+						if ip -6 address show dev "$dev6" | grep -q "BROADCAST"; then
 							try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+						elif ip -6 address show dev "$dev6" | grep -q "POINTOPOINT"; then
+							try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" || ipv6_error=1
+						else
+							state add 'errorSummary' 'errorInterfaceRoutingUnknownDevType' "$dev6"
 						fi
 						while read -r i; do
 							# shellcheck disable=SC2086
