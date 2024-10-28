@@ -18,7 +18,7 @@ readonly packageCompat='9'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageLockFile="/var/run/${packageName}.lock"
-readonly dnsmasqFileDefault="/var/dnsmasq.d/${packageName}"
+readonly dnsmasqFileDefault="/tmp/dnsmasq.d/${packageName}"
 readonly _OK_='\033[0;32m\xe2\x9c\x93\033[0m'
 readonly __OK__='\033[0;32m[\xe2\x9c\x93]\033[0m'
 readonly _OKB_='\033[1;34m\xe2\x9c\x93\033[0m'
@@ -61,6 +61,7 @@ procd_lan_interface=
 procd_wan_ignore_status=
 procd_wan_interface=
 procd_wan6_interface=
+procd_wan6_metric='128'
 resolver_set=
 resolver_instance=
 strict_enforcement=
@@ -182,6 +183,7 @@ pbr_get_gateway4() {
 }
 pbr_get_gateway6() {
 	local iface="$2" dev="$3" gw
+	[ "$iface" = "$procd_wan_interface" ] && iface="$procd_wan6_interface"  
 	network_get_gateway6 gw "$iface" true
 	if [ -z "$gw" ] || [ "$gw" = '::/0' ] || [ "$gw" = '::0/0' ] || [ "$gw" = '::' ]; then
 		gw="$(ip -6 a list dev "$dev" 2>/dev/null | grep inet6 | grep 'scope global' | awk '{print $2}')"
@@ -924,21 +926,20 @@ EOF
 	esac
 }
 
-_resolver_dnsmasq_confdir() {
-	local cfg="$1"
-	local confdir
-	[ -z "$(uci_get 'dhcp' "$cfg")" ] && return 1;
-	config_get confdir "$1" 'confdir'
-	if [ -z "$confdir" ] && [ "$resolver_instance" != "*" ]; then
-		state add 'warningSummary' 'warningDnsmasqInstanceNoConfdir' "$cfg"
-	fi
-	if [ -n "$confdir" ] && ! str_contains "$dnsmasqFileList" "$confdir"; then
-		dnsmasqFile="${confdir}/${packageName}"
-		dnsmasqFileList="${dnsmasqFileList:+$dnsmasqFileList }${dnsmasqFile}"
-	fi
-}
-
 resolver() {
+	_resolver_dnsmasq_confdir() {
+		local cfg="$1"
+		local confdir
+		[ -z "$(uci_get 'dhcp' "$cfg")" ] && return 1;
+		config_get confdir "$1" 'confdir' "/tmp/dnsmasq.d"
+		if [ -z "$confdir" ] && [ "$resolver_instance" != "*" ]; then
+			state add 'warningSummary' 'warningDnsmasqInstanceNoConfdir' "$cfg"
+		fi
+		if [ -n "$confdir" ] && ! str_contains "$dnsmasqFileList" "$confdir"; then
+			dnsmasqFile="${confdir}/${packageName}"
+			dnsmasqFileList="${dnsmasqFileList:+$dnsmasqFileList }${dnsmasqFile}"
+		fi
+	}
 	local agh_version
 	local param="$1" iface="$2" target="$3" type="$4" uid="$5" name="$6" value="$7"
 	shift
@@ -1595,9 +1596,9 @@ interface_routing() {
 				if [ -n "$gw4" ] || [ "$strict_enforcement" -ne '0' ]; then
 					ipv4_error=0
 					if [ -z "$gw4" ]; then
-						try ip -4 route add unreachable default table "$tid" >/dev/null 2>&1 || ipv4_error=1
+						try ip -4 route add unreachable default table "$tid" || ipv4_error=1
 					else
-						try ip -4 route add default via "$gw4" dev "$dev" table "$tid" >/dev/null 2>&1 || ipv4_error=1
+						try ip -4 route add default via "$gw4" dev "$dev" table "$tid" || ipv4_error=1
 					fi
 # shellcheck disable=SC2086
 					while read -r i; do
@@ -1605,7 +1606,7 @@ interface_routing() {
 						i="$(echo "$i" | sed 's/ onlink$//')"
 						idev="$(echo "$i" | grep -Eso 'dev [^ ]*' | awk '{print $2}')"
 						if ! is_supported_iface_dev "$idev"; then
-							try ip -4 route add $i table "$tid" >/dev/null 2>&1 || ipv4_error=1
+							try ip -4 route add $i table "$tid" || ipv4_error=1
 						fi
 					done << EOF
 					$(ip -4 route list table main)
@@ -1622,22 +1623,24 @@ EOF
 					ip -6 route flush table "$tid" >/dev/null 2>&1
 					if { [ -n "$gw6" ] && [ "$gw6" != "::/0" ]; } || [ "$strict_enforcement" -ne '0' ]; then
 						if [ -z "$gw6" ] || [ "$gw6" = "::/0" ]; then
-							try ip -6 route add unreachable default table "$tid" >/dev/null 2>&1 || ipv6_error=1
+							try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 						elif ip -6 route list table main | grep -q " dev $dev6 "; then
-							ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1 || ipv6_error=1
+							if ! ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1; then  
+								try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+							fi
 							while read -r i; do
 								i="$(echo "$i" | sed 's/ linkdown$//')"
 								i="$(echo "$i" | sed 's/ onlink$//')"
 								# shellcheck disable=SC2086
-								try ip -6 route add $i table "$tid" >/dev/null 2>&1 || ipv6_error=1
+								try ip -6 route add $i table "$tid" || ipv6_error=1
 							done << EOF
 							$(ip -6 route list table main | grep " dev $dev6 ")
 EOF
 						else
-							try ip -6 route add "$(ip -6 -o a show "$dev6" | awk '{print $4}')" dev "$dev6" table "$tid" >/dev/null 2>&1 || ipv6_error=1
-							try ip -6 route add default dev "$dev6" table "$tid" >/dev/null 2>&1 || ipv6_error=1
+							try ip -6 route add "$(ip -6 -o a show "$dev6" | awk '{print $4}')" dev "$dev6" table "$tid" || ipv6_error=1
+							try ip -6 route add default dev "$dev6" table "$tid" || ipv6_error=1
 						fi
-						try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$((priority-1))" >/dev/null 2>&1 || ipv6_error=1
+						try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$((priority-1))" || ipv6_error=1
 					fi
 				fi
 			fi
@@ -1686,9 +1689,9 @@ EOF
 			fi
 			if [ -n "$gw4" ] || [ "$strict_enforcement" -ne '0' ]; then
 				if [ -z "$gw4" ]; then
-					try ip -4 route add unreachable default table "$tid" >/dev/null 2>&1 || ipv4_error=1
+					try ip -4 route add unreachable default table "$tid" || ipv4_error=1
 				else
-					try ip -4 route add default via "$gw4" dev "$dev" table "$tid" >/dev/null 2>&1 || ipv4_error=1
+					try ip -4 route add default via "$gw4" dev "$dev" table "$tid" || ipv4_error=1
 				fi
 				try ip rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$priority" || ipv4_error=1
 			fi
@@ -1698,15 +1701,18 @@ EOF
 					if [ -z "$gw6" ] || [ "$gw6" = "::/0" ]; then
 						try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 					elif ip -6 route list table main | grep -q " dev $dev6 "; then
+						if ! ip -6 route add default via "$gw6" dev "$dev6" table "$tid" >/dev/null 2>&1; then  
+							try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+						fi
 						while read -r i; do
 							# shellcheck disable=SC2086
-							try ip -6 route add $i table "$tid" >/dev/null 2>&1 || ipv6_error=1
+							try ip -6 route add $i table "$tid" || ipv6_error=1
 						done << EOF
 						$(ip -6 route list table main | grep " dev $dev6 ")
 EOF
 					else
-						try ip -6 route add "$(ip -6 -o a show "$dev6" | awk '{print $4}')" dev "$dev6" table "$tid" >/dev/null 2>&1 || ipv6_error=1
-						try ip -6 route add default dev "$dev6" table "$tid" >/dev/null 2>&1 || ipv6_error=1
+						try ip -6 route add "$(ip -6 -o a show "$dev6" | awk '{print $4}')" dev "$dev6" table "$tid" || ipv6_error=1
+						try ip -6 route add default dev "$dev6" table "$tid" || ipv6_error=1
 					fi
 				fi
 				try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$priority" || ipv6_error=1
