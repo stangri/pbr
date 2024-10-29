@@ -1614,9 +1614,9 @@ EOF
 							try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 						elif ip -6 route list table main | grep -q " dev $dev6 "; then
 							if ip -6 address show dev "$dev6" | grep -q "BROADCAST"; then
-								try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+								try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
 							elif ip -6 address show dev "$dev6" | grep -q "POINTOPOINT"; then
-								try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" || ipv6_error=1
+								try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
 							else
 								state add 'errorSummary' 'errorInterfaceRoutingUnknownDevType' "$dev6"
 							fi
@@ -1697,9 +1697,9 @@ EOF
 						try ip -6 route add unreachable default table "$tid" || ipv6_error=1
 					elif ip -6 route list table main | grep -q " dev $dev6 "; then
 						if ip -6 address show dev "$dev6" | grep -q "BROADCAST"; then
-							try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
+							try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
 						elif ip -6 address show dev "$dev6" | grep -q "POINTOPOINT"; then
-							try ip -6 route add default via "$gw6" dev "$dev6" table "$tid" || ipv6_error=1
+							try ip -6 route add default dev "$dev6" table "$tid" metric "$procd_wan6_metric" || ipv6_error=1
 						else
 							state add 'errorSummary' 'errorInterfaceRoutingUnknownDevType' "$dev6"
 						fi
