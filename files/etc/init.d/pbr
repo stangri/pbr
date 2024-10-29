@@ -14,7 +14,7 @@ USE_PROCD=1
 
 readonly packageName='pbr'
 readonly PKG_VERSION='dev-test'
-readonly packageCompat='10'
+readonly packageCompat='11'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageLockFile="/var/run/${packageName}.lock"
@@ -57,7 +57,7 @@ nft_user_set_policy=
 nft_user_set_counter=
 procd_boot_delay=
 procd_reload_delay=
-procd_lan_interface=
+procd_lan_device=
 procd_wan_ignore_status=
 procd_wan_interface=
 procd_wan6_interface=
@@ -122,12 +122,11 @@ str_first_value_interface() { local i; for i in $1; do is_supported_interface "$
 str_first_value_ipv4() { local i; for i in $1; do is_ipv4 "$i" && { echo "$i"; break; }; done; }
 str_first_value_ipv6() { local i; for i in $1; do is_ipv6 "$i" && { echo "$i"; break; }; done; }
 str_first_word() { echo "${1%% *}"; }
-# shellcheck disable=SC2317
-str_replace() { printf "%b" "$1" | sed -e "s/$(printf "%b" "$2")/$(printf "%b" "$3")/g"; }
 str_replace() { echo "${1//$2/$3}"; }
 str_to_dnsmsaq_nftset() { echo "$1" | tr ' ' '/'; }
 str_to_lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 str_to_upper() { echo "$1" | tr 'a-z' 'A-Z'; }
+# shellcheck disable=SC3060
 output() {
 	local v="${verbosity:-1}"
 	[ "$#" -ne '1' ] && {
@@ -233,7 +232,7 @@ is_ipv6_local_scope() { is_ipv6_local_link "$1" || is_ipv6_local_unique "$1"; }
 is_ipv6_local_link() { [ "${1:0:4}" = 'fe80' ]; }
 is_ipv6_local_unique() { [ "${1:0:2}" = 'fc' ] || [ "${1:0:2}" = 'fd' ]; }
 is_list() { str_contains "$1" ',' || str_contains "$1" ' '; }
-is_lan() { local d; network_get_device d "$1"; str_contains "$procd_lan_interface" "$d"; }
+is_lan() { local d; network_get_device d "$1"; str_contains "$procd_lan_device" "$d"; }
 is_l2tp() { local p; network_get_protocol p "$1"; [ "${p:0:4}" = "l2tp" ]; }
 is_mac_address() { expr "$1" : '[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]$' >/dev/null; }
 is_negation() { [ "${1:0:1}" = '!' ]; }
@@ -410,7 +409,7 @@ get_text() {
 		warningOutdatedWebUIApp) r="The WebUI application is outdated (version %s), please update it.";;
 		warningBadNftCallsInUserFile) r="Incompatible nft calls detected in user include file, disabling fw4 nft file support.";;
 		warningDnsmasqInstanceNoConfdir) r="Dnsmasq instance '%s' targeted in settings, but it doesn't have its own confdir.";;
-		warningDhcpLanForce) r="Please set 'dhcp.lan.force=1' to speed up service start-up.";;
+		warningDhcpLanForce) r="Please set 'dhcp.%s.force=1' to speed up service start-up.";;
 	esac
 	echo "$r"
 }
@@ -477,7 +476,7 @@ load_package_config() {
 	config_get      verbosity                 'config' 'verbosity' '2'
 	config_get      procd_boot_delay          'config' 'procd_boot_delay' '0'
 	config_get      procd_boot_timeout        'config' 'procd_boot_timeout' '30'
-	config_get      procd_lan_interface       'config' 'procd_lan_interface'  'br-lan'
+	config_get      procd_lan_device          'config' 'procd_lan_device'  'br-lan'
 	config_get      procd_wan_ignore_status   'config' 'procd_wan_ignore_status' '0'
 	config_get      procd_wan_interface       'config' 'procd_wan_interface'  'wan'
 	config_get      procd_wan6_interface      'config' 'procd_wan6_interface' 'wan6'
@@ -526,13 +525,17 @@ load_package_config() {
 
 load_environment() {
 	_system_health_check() {
+# shellcheck disable=SC2317
+		_check_dhcp_force() {
+			is_lan "$1" || return 0
+			if [ "$(uci_get dhcp "$1" force 0)" = '0' ]; then
+				state add 'warningSummary' 'warningDhcpLanForce' "$1"
+			fi
+		}
 		local i _ret=0
 		if [ "$(uci_get 'firewall' 'defaults' 'auto_includes')" = '0' ]; then
 			uci_remove 'firewall' 'defaults' 'auto_includes'
 			uci_commit firewall
-		fi
-		if [ "$(uci_get dhcp lan force 0)" = '0' ]; then
-			state add 'warningSummary' 'warningDhcpLanForce'
 		fi
 		# TODO: implement ip-full check
 		# state add 'errorSummary' 'errorRequiredBinaryMissing' 'ip-full'
@@ -552,6 +555,8 @@ load_environment() {
 				_ret='1'
 			fi
 		done
+		config_load 'network'
+		config_foreach _check_dhcp_force 'interface'
 		return "$_ret"
 	}
 	local param="$1" validation_result="$2"
@@ -2305,7 +2310,7 @@ load_validate_config() {
 		'procd_boot_delay:integer:0' \
 		'procd_boot_timeout:integer:30' \
 		'procd_reload_delay:integer:0' \
-		'procd_lan_interface:list(or(network)):br-lan' \
+		'procd_lan_device:list(or(network)):br-lan' \
 		'procd_wan_ignore_status:bool:0' \
 		'procd_wan_interface:network:wan' \
 		'procd_wan6_interface:network:wan6' \
@@ -2350,7 +2355,7 @@ load_validate_policy() {
 		'enabled:bool:1' \
 		'interface:or("ignore", "tor", regex("xray_.*"), uci("network", "@interface")):wan' \
 		'proto:or(string)' \
-		'chain:or("", "forward", "input", "output", "prerouting", "postrouting", "FORWARD", "INPUT", "OUTPUT", "PREROUTING", "POSTROUTING"):prerouting' \
+		'chain:or("", "forward", "input", "output", "prerouting", "postrouting"):prerouting' \
 		'src_addr:list(neg(or(host,network,macaddr,string)))' \
 		'src_port:list(neg(or(portrange,string)))' \
 		'dest_addr:list(neg(or(host,network,string)))' \
