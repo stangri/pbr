@@ -477,7 +477,7 @@ load_package_config() {
 	config_get      procd_boot_delay          'config' 'procd_boot_delay' '0'
 	config_get      procd_boot_timeout        'config' 'procd_boot_timeout' '30'
 	config_get      procd_lan_device          'config' 'procd_lan_device'  'br-lan'
-	config_get      procd_wan_ignore_status   'config' 'procd_wan_ignore_status' '0'
+	config_get      procd_wan_ignore_status   'config' 'procd_wan_ignore_status' '1'
 	config_get      procd_wan_interface       'config' 'procd_wan_interface'  'wan'
 	config_get      procd_wan6_interface      'config' 'procd_wan6_interface' 'wan6'
 	config_get      wan_ip_rules_priority     'config' 'wan_ip_rules_priority' '30000'
@@ -2008,7 +2008,7 @@ start_service() {
 	local resolverStoredHash resolverNewHash i param="$1" reloadedIface
 
 	load_environment "${param:-on_start}" "$(load_validate_config)" || return 1
-#	is_wan_up "$param" || return 1
+	is_wan_up "$param" || return 1
 
 	process_interface 'all' 'prepare'
 	config_foreach process_interface 'interface' 'pre_init'
@@ -2311,7 +2311,7 @@ load_validate_config() {
 		'procd_boot_timeout:integer:30' \
 		'procd_reload_delay:integer:0' \
 		'procd_lan_device:list(or(network)):br-lan' \
-		'procd_wan_ignore_status:bool:0' \
+		'procd_wan_ignore_status:bool:1' \
 		'procd_wan_interface:network:wan' \
 		'procd_wan6_interface:network:wan6' \
 		'wan_ip_rules_priority:uinteger:30000' \
