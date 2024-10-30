@@ -1728,7 +1728,7 @@ EOF
 
 json_add_gateway() {
 	local action="$1" tid="$2" mark="$3" iface="$4" gw4="$5" dev4="$6" gw6="$7" dev6="$8" priority="$9" default="${10}"
-	json_add_object ''
+	json_add_object 'gateways'
 	json_add_string 'name' "$iface"
 	json_add_string 'device_ipv4' "$dev4"
 	json_add_string 'gateway_ipv4' "$gw4"
