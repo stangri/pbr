@@ -537,8 +537,10 @@ load_environment() {
 			uci_remove 'firewall' 'defaults' 'auto_includes'
 			uci_commit firewall
 		fi
-		# TODO: implement ip-full check
-		# state add 'errorSummary' 'errorRequiredBinaryMissing' 'ip-full'
+		if [ "$(readlink /sbin/ip)" != "$ip_full" ]; then
+			state add 'errorSummary' 'errorRequiredBinaryMissing' 'ip-full'
+			_ret='1'
+		fi
 		if ! nft_call list table inet fw4; then
 			state add 'errorSummary' 'errorDefaultFw4TableMissing' 'fw4'
 			_ret='1'
