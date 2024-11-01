@@ -563,7 +563,7 @@ load_environment() {
 	}
 	local param="$1" validation_result="$2"
 	case "$param" in
-		on_start)
+		on_start|on_boot)
 			output 1 "Loading environment ($param) "
 			load_package_config "$param"
 			if [ "$enabled" -eq '0' ]; then
