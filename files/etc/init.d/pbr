@@ -187,15 +187,7 @@ filter_options() {
 	echo "$_ret"
 	return 0
 }
-inline_set() {
-	local value="$1" inline_set i
-	for i in $value; do
-		[ "${i:0:1}" = "!" ] && i=${i:1}
-		[ "${i:0:1}" = "@" ] && i=${i:1}
-		inline_set="${inline_set:+$inline_set, }$i"
-	done
-	echo "$inline_set"
-}
+inline_set(){ set " ${1// /, } ";set "${1// [@!]/ }";set "${1# }";echo "${1% }";}
 # shellcheck disable=SC2016
 is_bad_user_file_nft_call() { grep -q '"\$nft" list' "$1" || grep '"\$nft" -f' "$1"; }
 is_config_enabled() {
