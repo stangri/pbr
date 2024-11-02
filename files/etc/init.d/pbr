@@ -293,7 +293,7 @@ resolveip_to_nftset() { resolveip "$@" | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d'; }
 resolveip_to_nftset4() { resolveip_to_nftset -4 "$@"; }
 resolveip_to_nftset6() { [ -n "$ipv6_enabled" ] && resolveip_to_nftset -6 "$@"; }
 # shellcheck disable=SC2016
-ipv4_leases_to_nftset() { [ -s '/tmp/dhcp.leases' ] || return 1; grep "$1" '/tmp/dhcp.leases' | awk '{print $3}' | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d' | tr '\n' ' '; }
+ipv4_leases_to_nftset(){ [ -s '/tmp/dhcp.leases' ] && awk -v arg=$1 'BEGIN{fs=""};$0~arg{printf fs$3;fs=","}' /tmp/dhcp.leases;}
 # shellcheck disable=SC2016
 ipv6_leases_to_nftset() { [ -s '/tmp/hosts/odhcpd' ] || return 1; grep -v '^#' '/tmp/hosts/odhcpd' | grep "$1" | awk '{print $1}' | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d' | tr '\n' ' '; }
 # shellcheck disable=SC3037
