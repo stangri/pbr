@@ -249,7 +249,7 @@ is_supported_iface_dev() { local n dev; for n in $ifacesSupported; do network_ge
 is_supported_protocol(){ grep -qi "^${1:--}" /etc/protocols;}
 is_pptp() { local p; network_get_protocol p "$1"; [ "${p:0:4}" = "pptp" ]; }
 is_softether() { local d; network_get_device d "$1"; [ "${d:0:4}" = "vpn_" ]; }
-is_supported_interface() { is_lan "$1" && return 1; str_contains_word "$supported_interface" "$1" || { ! is_ignored_interface "$1" && ! is_disabled_interface "$1" && { is_wan "$1" || is_wan6 "$1" || is_tunnel "$1"; }; } || is_ignore_target "$1" || is_xray "$1"; }
+is_supported_interface() { { is_lan "$1" || is_disabled_interface "$1"; } && return 1; str_contains_word "$supported_interface" "$1" || { ! is_ignored_interface "$1" && { is_wan "$1" || is_wan6 "$1" || is_tunnel "$1"; }; } || is_ignore_target "$1" || is_xray "$1"; }
 is_tailscale() { local d; network_get_device d "$1"; [ "${d:0:9}" = "tailscale" ]; }
 is_tor() { [ "$(str_to_lower "$1")" = "tor" ]; }
 is_tor_running() {
