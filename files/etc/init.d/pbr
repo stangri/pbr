@@ -2223,6 +2223,20 @@ setup_netifd() {
 			fi
 			uci_set 'network' "${iface}" 'ip4table' "${ipTablePrefix}_${iface%6}"
 			uci_set 'network' "${iface}" 'ip6table' "${ipTablePrefix}_${iface%6}"
+
+			_pbr_netifd_set_defrt() {
+				local IPV="$1"
+				output "Setting up ${packageName} default IP${IPV} route for ${iface} "
+				uci_add 'network' 'route' "${ipTablePrefix}_${iface%6}_${IPV}"
+				uci_set 'network' "${ipTablePrefix}_${iface%6}_${IPV}" 'interface' "${iface%6}"
+				if [ "$IPV" = "6" ]; then
+					uci_set 'network' "${ipTablePrefix}_${iface%6}_${IPV}" 'target' '::0/0'
+				else
+					uci_set 'network' "${ipTablePrefix}_${iface%6}_${IPV}" 'target' '0.0.0.0/0'
+				fi
+			}
+			_pbr_netifd_set_defrt 4
+			[ $(uci -q get pbr.config.ipv6_enabled) -eq 1 ] && _pbr_netifd_set_defrt 6
 			output_okbn
 		fi
 	}
