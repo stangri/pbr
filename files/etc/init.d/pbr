@@ -128,9 +128,9 @@ str_to_lower() { echo "$1" | tr 'A-Z' 'a-z'; }
 str_to_upper() { echo "$1" | tr 'a-z' 'A-Z'; }
 # shellcheck disable=SC3060
 output() {
-	local v="${verbosity:-1}"
+	[ -z "$verbosity" ] && verbosity="$(uci_get "$packageName" 'config' 'verbosity' '1')"
 	[ "$#" -ne '1' ] && {
-		case "$1" in [0-9]) [ $((v & $1)) -gt 0 ] && shift || return 0;; esac }
+		case "$1" in [0-9]) [ $((verbosity & $1)) -gt 0 ] && shift || return 0;; esac }
 	local msg="$*" queue="/dev/shm/$packageName-output"
 	[ -t 1 ] && printf "%b" "$msg"
 	[ "$msg" != "${msg//\\n}" ] && {
@@ -190,14 +190,14 @@ filter_options() {
 inline_set() {
 	local value="$1" inline_set i
 	for i in $value; do
-		inline_set="${inline_set:+$inline_set, }${i#[@!]}"
+		inline_set="${inline_set:+$inline_set, }${i#[@\!]}"
 	done
 	echo "$inline_set"
 }
 # shellcheck disable=SC2016
 is_bad_user_file_nft_call() { grep -q '"\$nft" list' "$1" || grep '"\$nft" -f' "$1"; }
-is_config_enabled() {
 # shellcheck disable=SC2317
+is_config_enabled() {
 	_check_config() { local en; config_get_bool en "$1" 'enabled' '1'; [ "$en" -gt '0' ] && _cfg_enabled=0; }
 	local cfg="$1" _cfg_enabled=1
 	[ -n "$1" ] || return 1
@@ -205,7 +205,6 @@ is_config_enabled() {
 	config_foreach _check_config "$cfg"
 	return "$_cfg_enabled"
 }
-# shellcheck disable=SC2317
 uci_get_device() {
 	local __tmp
 	__tmp="$(uci_get 'network' "$2" 'device')"
@@ -247,21 +246,10 @@ is_supported_iface_dev() { local n dev; for n in $ifacesSupported; do network_ge
 is_supported_protocol(){ grep -qi "^${1:--}" /etc/protocols;}
 is_pptp() { local p; network_get_protocol p "$1"; [ "${p:0:4}" = "pptp" ]; }
 is_softether() { local d; network_get_device d "$1"; [ "${d:0:4}" = "vpn_" ]; }
-is_supported_interface() { is_lan "$1" && return 1; str_contains_word "$supported_interface" "$1" || { ! is_ignored_interface "$1" && ! is_disabled_interface "$1" && { is_wan "$1" || is_wan6 "$1" || is_tunnel "$1"; }; } || is_ignore_target "$1" || is_xray "$1"; }
+is_supported_interface() { { is_lan "$1" || is_disabled_interface "$1"; } && return 1; str_contains_word "$supported_interface" "$1" || { ! is_ignored_interface "$1" && { is_wan "$1" || is_wan6 "$1" || is_tunnel "$1"; }; } || is_ignore_target "$1" || is_xray "$1"; }
 is_tailscale() { local d; network_get_device d "$1"; [ "${d:0:9}" = "tailscale" ]; }
 is_tor() { [ "$(str_to_lower "$1")" = "tor" ]; }
-is_tor_running() {
-	local ret=0
-	is_ignored_interface 'tor' && return 1
-	[ -s "$torConfigFile" ] || return 1
-	json_load "$(ubus call service list "{ 'name': 'tor' }")" >/dev/null || return 1
-	json_select 'tor' >/dev/null || return 1
-	json_select 'instances' >/dev/null || return 1
-	json_select 'instance1' >/dev/null || return 1
-	json_get_var ret 'running' >/dev/null || return 1
-	json_cleanup
-	if [ "$ret" = "0" ]; then return 1; else return 0; fi
-}
+is_tor_running() { ! is_ignored_interface 'tor' && [ -s "$torConfigFile" ] && str_contains "$(ubus call service list "{ 'name': 'tor' }" | jsonfilter -e '@.tor.instances.*.running')" 'true' && return 0 || return 1; }
 is_tunnel() { is_dslite "$1" || is_l2tp "$1" || is_oc "$1" || is_ovpn "$1" || is_pptp "$1" || is_softether "$1" || is_tailscale "$1" || is_tor "$1" || is_wg "$1"; }
 is_url() { is_url_file "$1" || is_url_dl "$1"; }
 is_url_dl() { is_url_ftp "$1" || is_url_http "$1" || is_url_https "$1"; }
@@ -291,9 +279,9 @@ resolveip_to_nftset() { resolveip "$@" | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d'; }
 resolveip_to_nftset4() { resolveip_to_nftset -4 "$@"; }
 resolveip_to_nftset6() { [ -n "$ipv6_enabled" ] && resolveip_to_nftset -6 "$@"; }
 # shellcheck disable=SC2016
-ipv4_leases_to_nftset() { [ -s '/tmp/dhcp.leases' ] || return 1; grep "$1" '/tmp/dhcp.leases' | awk '{print $3}' | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d' | tr '\n' ' '; }
+ipv4_leases_to_nftset(){ [ -s '/tmp/dhcp.leases' ] && awk -v arg=$1 'BEGIN{fs=""};$0~arg{printf fs$3;fs=","}' /tmp/dhcp.leases;}
 # shellcheck disable=SC2016
-ipv6_leases_to_nftset() { [ -s '/tmp/hosts/odhcpd' ] || return 1; grep -v '^#' '/tmp/hosts/odhcpd' | grep "$1" | awk '{print $1}' | sed -n 'H;${x;s/\n/,/g;s/^,//;p;};d' | tr '\n' ' '; }
+ipv6_leases_to_nftset(){ [ -s '/tmp/hosts/odhcpd' ] && awk -v arg=$1 'BEGIN{fs=""};$0~arg{printf fs$1;fs=","}' /tmp/hosts/odhcpd;}
 # shellcheck disable=SC3037
 ports_to_nftset() { echo -en "$1"; }
 get_mark_nft_chains() { [ -x "$nft" ] && "$nft" list table inet "$nftTable" 2>/dev/null | grep chain | grep "${nftPrefix}_mark_" | awk '{ print $2 }'; }
@@ -521,9 +509,9 @@ load_package_config() {
 
 }
 
+# shellcheck disable=SC2317
 load_environment() {
 	_system_health_check() {
-# shellcheck disable=SC2317
 		_check_dhcp_force() {
 			is_lan "$1" || return 0
 			if [ "$(uci_get dhcp "$1" force 0)" = '0' ]; then
@@ -594,10 +582,9 @@ load_environment() {
 	esac
 }
 
+# shellcheck disable=SC2317
 load_network() {
-# shellcheck disable=SC2317
 	_build_ifaces_supported() { is_supported_interface "$1" && ! str_contains "$ifacesSupported" "$1" && ifacesSupported="${ifacesSupported}${1} "; }
-# shellcheck disable=SC2317
 	_find_firewall_wan_zone() { [ "$(uci_get 'firewall' "$1" 'name')" = "wan" ] && firewallWanZone="$1"; }
 	local i param="$1"
 	local dev4 dev6
@@ -2226,6 +2213,57 @@ stop_service() {
 }
 
 version() { echo "$PKG_VERSION"; }
+
+# shellcheck disable=SC2317
+setup_netifd() {
+	local param="$1"
+	_pbr_iface_setup() {
+		local iface="${1}" param="$2" tid
+		if is_supported_interface "${iface}"; then
+			output "Setting up ${packageName} routing tables for ${iface} ${param:+($param) }"
+			tid="$(get_rt_tables_next_id)"
+			if ! grep -q "$tid ${ipTablePrefix}_${iface%6}" "$rtTablesFile"; then
+				sed -i "/${ipTablePrefix}_${iface%6}/d" "$rtTablesFile"
+				echo "$tid ${ipTablePrefix}_${iface%6}" >> "$rtTablesFile"
+				sync
+			fi
+			uci_set 'network' "${iface}" 'ip4table' "${ipTablePrefix}_${iface%6}"
+			uci_set 'network' "${iface}" 'ip6table' "${ipTablePrefix}_${iface%6}"
+			output_okbn
+		fi
+	}
+	_pbr_default_route_setup() {
+		local iface iface6 param="$1"
+		iface="$(uci_get 'pbr' 'config' 'procd_wan_interface')"
+		iface6="$(uci_get 'pbr' 'config' 'procd_wan6_interface')"
+		[ -z "$iface" ] && { network_flush_cache; network_find_wan iface; }
+		[ -z "$iface6" ] && { network_flush_cache; network_find_wan6 iface6; }
+		output "Setting up ${packageName} default route for ${iface:-wan} ${param:+($param) }"
+		uci -q delete network.default || true # remove manual default route
+		uci -q delete network.pbr_default || true
+		uci_add network rule pbr_default
+		uci_set network pbr_default lookup "pbr_${iface:-wan}"
+		uci_set network pbr_default priority "40000"
+		output_okbn
+		output "Setting up ${packageName} default route for ${iface6:-wan6} ${param:+($param) }"
+		uci -q delete network.default6 || true # remove manual default route
+		uci -q delete network.pbr_default6 || true
+		uci_add network rule6 pbr_default6
+		uci_set network pbr_default6 lookup "pbr_${iface6:-wan6}"
+		uci_set network pbr_default6 priority "40000"
+		output_okbn
+	}
+	sed -i "/${ipTablePrefix}_/d" "$rtTablesFile"
+	sync
+	config_load 'network'
+	config_foreach _pbr_iface_setup 'interface' "$param"
+	_pbr_default_route_setup "$param"
+	uci_commit 'network'
+	sync
+	output "Restarting network ${param:+($param) }"
+	/etc/init.d/network restart
+	output_okn
+}
 
 status_service() {
 	local i dev dev6 wan_tid
