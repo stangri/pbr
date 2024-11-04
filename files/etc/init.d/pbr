@@ -814,7 +814,6 @@ cleanup_rt_tables() {
 	for i in $(grep -oh "${ipTablePrefix}_.*" "$rtTablesFile"); do
 		! is_netifd_table "$i" && sed -i "/${i}/d" "$rtTablesFile"
 	done
-	sync
 }
 
 cleanup_main_chains() {
@@ -1566,7 +1565,6 @@ interface_routing() {
 				if ! grep -q "$tid ${ipTablePrefix}_${iface}" "$rtTablesFile"; then
 					sed -i "/${ipTablePrefix}_${iface}/d" "$rtTablesFile"
 					echo "$tid ${ipTablePrefix}_${iface}" >> "$rtTablesFile"
-					sync
 				fi
 				ip -4 rule flush table "$tid" >/dev/null 2>&1
 				ip -4 route flush table "$tid" >/dev/null 2>&1
@@ -1659,7 +1657,6 @@ EOF
 				ip rule flush table "$tid" >/dev/null 2>&1
 				ip route flush table "$tid" >/dev/null 2>&1
 				sed -i "/${ipTablePrefix}_${iface}\$/d" "$rtTablesFile"
-				sync
 			fi
 			return "$s"
 		;;
@@ -2225,7 +2222,6 @@ setup_netifd() {
 			if ! grep -q "$tid ${ipTablePrefix}_${iface%6}" "$rtTablesFile"; then
 				sed -i "/${ipTablePrefix}_${iface%6}/d" "$rtTablesFile"
 				echo "$tid ${ipTablePrefix}_${iface%6}" >> "$rtTablesFile"
-				sync
 			fi
 			uci_set 'network' "${iface}" 'ip4table' "${ipTablePrefix}_${iface%6}"
 			uci_set 'network' "${iface}" 'ip6table' "${ipTablePrefix}_${iface%6}"
@@ -2254,12 +2250,10 @@ setup_netifd() {
 		output_okbn
 	}
 	sed -i "/${ipTablePrefix}_/d" "$rtTablesFile"
-	sync
 	config_load 'network'
 	config_foreach _pbr_iface_setup 'interface' "$param"
 	_pbr_default_route_setup "$param"
 	uci_commit 'network'
-	sync
 	output "Restarting network ${param:+($param) }"
 	/etc/init.d/network restart
 	output_okn
