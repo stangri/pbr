@@ -891,7 +891,6 @@ cleanup_rt_tables() {
 	for i in $(grep -oh "${ipTablePrefix}_.*" $rtTablesFile); do
 		! is_netifd_table "$i" && sed -i "/${i}/d" "$rtTablesFile"
 	done
-	sync
 }
 
 cleanup_main_chains() {
@@ -1702,9 +1701,7 @@ interface_routing() {
 			else
 				if ! grep -q "$tid ${ipTablePrefix}_${iface}" "$rtTablesFile"; then
 					sed -i "/${ipTablePrefix}_${iface}/d" "$rtTablesFile"
-					sync
 					echo "$tid ${ipTablePrefix}_${iface}" >> "$rtTablesFile"
-					sync
 				fi
 				ip -4 rule del table "$tid" >/dev/null 2>&1
 				ip -4 route flush table "$tid" >/dev/null 2>&1
@@ -1786,7 +1783,6 @@ EOF
 			if ! is_netifd_table_interface "$iface"; then
 				ip route flush table "$tid" >/dev/null 2>&1
 				sed -i "/${ipTablePrefix}_${iface}\$/d" "$rtTablesFile"
-				sync
 			fi
 			return "$s"
 		;;
