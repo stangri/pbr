@@ -103,8 +103,10 @@ define Package/pbr/postinst
 		chmod -x /etc/init.d/pbr || true
 		fw4 -q reload || true
 		chmod +x /etc/init.d/pbr || true
+		[ -f "/tmp/pbr-enabled" ] || break
 		echo -n "Installing rc.d symlink for pbr... "
 		/etc/init.d/pbr enable && echo "OK" || echo "FAIL"
+		/etc/init.d/pbr enabled && rm "/tmp/pbr-enabled"		
 	fi
 	exit 0
 endef
@@ -114,6 +116,7 @@ define Package/pbr/prerm
 	# check if we are on real system
 	if [ -z "$${IPKG_INSTROOT}" ]; then
 		uci -q delete firewall.pbr || true
+		/etc/init.d/pbr enabled && touch "/tmp/pbr-enabled"
 		echo -n "Stopping pbr service... "
 		/etc/init.d/pbr stop quiet >/dev/null 2>&1 && echo "OK" || echo "FAIL"
 		echo -n "Removing rc.d symlink for pbr... "
@@ -138,8 +141,10 @@ define Package/pbr-netifd/postinst
 		chmod -x /etc/init.d/pbr || true
 		fw4 -q reload || true
 		chmod +x /etc/init.d/pbr || true
+		[ -f "/tmp/pbr-netifd-enabled" ] || break
 		echo -n "Installing rc.d symlink for pbr-netifd... "
 		/etc/init.d/pbr enable && echo "OK" || echo "FAIL"
+		/etc/init.d/pbr enabled && rm "/tmp/pbr-netifd-enabled"		
 	fi
 	exit 0
 endef
@@ -148,6 +153,7 @@ define Package/pbr-netifd/prerm
 	#!/bin/sh
 	# check if we are on real system
 	if [ -z "$${IPKG_INSTROOT}" ]; then
+		/etc/init.d/pbr enabled && touch "/tmp/pbr-netifd-enabled"
 		uci -q delete firewall.pbr || true
 		echo -n "Stopping pbr-netifd service... "
 		/etc/init.d/pbr stop quiet >/dev/null 2>&1 && echo "OK" || echo "FAIL"

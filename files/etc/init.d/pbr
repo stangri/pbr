@@ -48,7 +48,6 @@ readonly rtTablesFile='/etc/iproute2/rt_tables'
 
 # package config options
 procd_boot_timeout=
-enabled=
 fw_mask=
 icmp_interface=
 ignored_interface=
@@ -298,7 +297,6 @@ uci_get_listen_port() {
 }
 
 # luci app specific
-is_enabled() { uci_get "$1" 'config' 'enabled'; }
 is_running_nft_file() { [ -s "$nftPermFile" ]; }
 is_running_nft() { "$nft" list table inet fw4 | grep chain | grep -q pbr_mark_ >/dev/null 2>&1; }
 check_nft() { [ -x "$nft" ]; }
@@ -347,7 +345,6 @@ get_text() {
 		errorConfigValidation) r="Config ($packageConfigFile) validation failure!";;
 		errorNoNft) r="Resolver set support (${resolver_set}) requires nftables, but nft binary cannot be found!";;
 		errorResolverNotSupported) r="Resolver set (${resolver_set}) is not supported on this system!";;
-		errorServiceDisabled) r="The ${packageName} service is currently disabled!";;
 		errorNoWanGateway) r="The ${serviceName} service failed to discover WAN gateway!";;
 		errorNoWanInterface) r="The %s interface not found, you need to set the 'pbr.config.procd_wan_interface' option!";;
 		errorNoWanInterfaceHint) r="Refer to https://docs.openwrt.melmac.net/pbr/#procd_wan_interface.";;
@@ -442,7 +439,6 @@ load_package_config() {
 	local param="$1"
 	local user_file_check_result i
 	config_load "$packageName"
-	config_get_bool enabled                   'config' 'enabled' '0'
 	config_get      fw_mask                   'config' 'fw_mask' 'ff0000'
 	config_get      icmp_interface            'config' 'icmp_interface'
 	config_get      ignored_interface         'config' 'ignored_interface'
@@ -552,11 +548,6 @@ load_environment() {
 		on_boot|on_start)
 			output 1 "Loading environment ($param) "
 			load_package_config "$param"
-			if [ "$enabled" -eq '0' ]; then
-				output 1 "$_FAIL_\n"
-				state add 'errorSummary' 'errorServiceDisabled'
-				return 1
-			fi
 			if [ -n "$validation_result" ] && [ "$validation_result" != '0' ]; then
 				output 1 "$_FAIL_\n"
 				output "${_ERROR_}: The $packageName config validation failed!\n"
@@ -2202,7 +2193,7 @@ stop_service() {
 	resolver 'store_hash'
 	resolver 'cleanup_all'
 	resolver 'compare_hash' && resolver 'restart'
-	if [ "$enabled" -ne '0' ]; then
+	if enabled; then
 		if [ -n "$nft_file_mode" ]; then
 			output "$serviceName (fw4 nft file mode) stopped "; output_okn;
 		else
@@ -2410,3 +2401,5 @@ load_validate_include() {
 		'path:file' \
 		'enabled:bool:0'
 }
+
+service_running(){ [ -f "$packageLockFile" ];}
