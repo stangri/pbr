@@ -1560,7 +1560,7 @@ interface_routing() {
 				if [ -n "$ipv6_enabled" ]; then
 					ipv6_error=0
 					ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
-					try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$((priority-1))" || ipv6_error=1
+					try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$priority" || ipv6_error=1
 				fi
 			else
 				if ! grep -q "$tid ${ipTablePrefix}_${iface}" "$rtTablesFile"; then
@@ -1624,7 +1624,7 @@ EOF
 							try ip -6 route add "$(ip -6 -o a show "$dev6" | awk '{print $4}')" dev "$dev6" table "$tid" || ipv6_error=1
 							try ip -6 route add default dev "$dev6" table "$tid" || ipv6_error=1
 						fi
-						try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$((priority-1))" || ipv6_error=1
+						try ip -6 rule add fwmark "${mark}/${fw_mask}" table "$tid" priority "$priority" || ipv6_error=1
 					fi
 				fi
 			fi
@@ -1655,9 +1655,14 @@ EOF
 		;;
 		delete|destroy)
 			ip rule del table "$tid" prio "$priority" >/dev/null 2>&1
+			[ -n "$ipv6_enabled" ] && ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
 			if ! is_netifd_table_interface "$iface"; then
 				ip rule flush table "$tid" >/dev/null 2>&1
 				ip route flush table "$tid" >/dev/null 2>&1
+				if [ -n "$ipv6_enabled" ]; then
+					ip -6 rule flush table "$tid" >/dev/null 2>&1
+					ip -6 route flush table "$tid" >/dev/null 2>&1
+				fi
 				sed -i "/${ipTablePrefix}_${iface}\$/d" "$rtTablesFile"
 				sync
 			fi
@@ -1665,11 +1670,16 @@ EOF
 		;;
 		reload_interface)
 			ip rule del table "$tid" prio "$priority" >/dev/null 2>&1
+			[ -n "$ipv6_enabled" ] && ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
 			is_netifd_table_interface "$iface" && return 0;
 			ipv4_error=0
 			if ! is_netifd_table_interface "$iface"; then
 				ip rule flush table "$tid" >/dev/null 2>&1
 				ip route flush table "$tid" >/dev/null 2>&1
+				if [ -n "$ipv6_enabled" ]; then
+					ip -6 rule flush table "$tid" >/dev/null 2>&1
+					ip -6 route flush table "$tid" >/dev/null 2>&1
+				fi
 			fi
 			if [ -n "$gw4" ] || [ "$strict_enforcement" -ne '0' ]; then
 				if [ -z "$gw4" ]; then
@@ -1773,15 +1783,15 @@ process_interface() {
 						ip rule add sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
 					fi
 					if [ -n "$ipv6_enabled" ] && [ -n "$wanIface6" ]; then
-						ip rule del sport "$listen_port" table "pbr_${wanIface6}" >/dev/null 2>&1
-						ip rule add sport "$listen_port" table "pbr_${wanIface6}" >/dev/null 2>&1
+						ip -6 rule del sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
+						ip -6 rule add sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
 					fi
 				fi
 			;;
 			destroy)
 				if [ -n "$listen_port" ]; then
 					ip rule del sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
-					ip rule del sport "$listen_port" table "pbr_${wanIface6}" >/dev/null 2>&1
+					ip -6 rule del sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
 				fi
 			;;
 		esac
@@ -1874,7 +1884,8 @@ process_interface() {
 			displayText="${iface}/${dispDev:+$dispDev/}${dispGw4}${ipv6_enabled:+/$dispGw6}"
 			displayText="${iface}/${dispDev:+$dispDev/}${dispGw4}${ipv6_enabled:+/$dispGw6}"
 			output 2 "Removing routing for '$displayText' "
-			interface_routing 'destroy' "${ifaceTableID}" "${ifaceMark}" "${iface}"
+			#interface_routing 'destroy' "${ifaceTableID}" "${ifaceMark}" "${iface}"
+			interface_routing 'destroy' "$ifaceTableID" "$ifaceMark" "$iface" "$gw4" "$dev" "$gw6" "$dev6" "$ifacePriority"
 			if is_netifd_table_interface "$iface"; then output_okb; else output_ok; fi
 		;;
 		reload)
