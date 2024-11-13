@@ -188,4 +188,4 @@ define Package/pbr-netifd/postrm
 endef
 
 $(eval $(call BuildPackage,pbr))
-$(eval $(call BuildPackage,pbr-netifd))
+# $(eval $(call BuildPackage,pbr-netifd))
