@@ -2332,12 +2332,13 @@ status_service() {
 	tableCount="$(grep -c "${packageName}_" "$rtTablesFile")" || tableCount=0
 	wan_tid=$(($(get_rt_tables_next_id)-tableCount))
 	i=0; while [ "$i" -lt "$tableCount" ]; do
-		local status_table="$(grep $((wan_tid + i)) "$rtTablesFile")"
+		local status_table
+		status_table="$(grep $((wan_tid + i)) "$rtTablesFile")"
 		echo "IPv4 table $status_table route:"
 		ip -4 route show table "$((wan_tid + i))" | grep default
 		echo "IPv4 table $status_table rule(s):"
 		ip -4 rule list table "$((wan_tid + i))"
-		if [ "$(uci_get $packageName config ipv6_enabled)" = "1" ]; then
+		if [ "$(uci_get "$packageName" config ipv6_enabled)" = "1" ]; then
 			echo "$_SEPARATOR_"
 			echo "IPv6 table $status_table route:"
 			ip -6 route show table "$((wan_tid + i))" | grep default
