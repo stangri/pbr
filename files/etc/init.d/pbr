@@ -1659,28 +1659,26 @@ EOF
 			return "$s"
 		;;
 		delete|destroy)
-			ip rule del table "$tid" prio "$priority" >/dev/null 2>&1
-			[ -n "$ipv6_enabled" ] && ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
+			ip -4 rule del table "$tid" prio "$priority" >/dev/null 2>&1
+			ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
 			if ! is_netifd_table_interface "$iface"; then
-				ip rule flush table "$tid" >/dev/null 2>&1
-				ip route flush table "$tid" >/dev/null 2>&1
-				if [ -n "$ipv6_enabled" ]; then
-					ip -6 rule flush table "$tid" >/dev/null 2>&1
-					ip -6 route flush table "$tid" >/dev/null 2>&1
-				fi
+				ip -4 rule flush table "$tid" >/dev/null 2>&1
+				ip -4 route flush table "$tid" >/dev/null 2>&1
+				ip -6 rule flush table "$tid" >/dev/null 2>&1
+				ip -6 route flush table "$tid" >/dev/null 2>&1
 				sed -i "/${ipTablePrefix}_${iface}\$/d" "$rtTablesFile"
 				sync
 			fi
 			return "$s"
 		;;
 		reload_interface)
-			ip rule del table "$tid" prio "$priority" >/dev/null 2>&1
+			ip -4 rule del table "$tid" prio "$priority" >/dev/null 2>&1
 			[ -n "$ipv6_enabled" ] && ip -6 rule del table "$tid" prio "$priority" >/dev/null 2>&1
 			is_netifd_table_interface "$iface" && return 0;
 			ipv4_error=0
 			if ! is_netifd_table_interface "$iface"; then
-				ip rule flush table "$tid" >/dev/null 2>&1
-				ip route flush table "$tid" >/dev/null 2>&1
+				ip -4 rule flush table "$tid" >/dev/null 2>&1
+				ip -4 route flush table "$tid" >/dev/null 2>&1
 				if [ -n "$ipv6_enabled" ]; then
 					ip -6 rule flush table "$tid" >/dev/null 2>&1
 					ip -6 route flush table "$tid" >/dev/null 2>&1
