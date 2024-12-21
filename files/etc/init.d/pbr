@@ -45,6 +45,11 @@ readonly ssConfigFile='/etc/shadowsocks'
 readonly torConfigFile='/etc/tor/torrc'
 readonly xrayIfacePrefix='xray_'
 readonly rtTablesFile='/etc/iproute2/rt_tables'
+readonly wget='/usr/libexec/wget-nossl'
+readonly fetch='/bin/uclient-fetch'
+readonly fetchssl='/lib/libustream-ssl.so'
+readonly wgetssl='/usr/libexec/wget-ssl'
+readonly curl='/usr/bin/curl'
 
 # package config options
 procd_boot_timeout=
@@ -377,10 +382,9 @@ get_text() {
 		errorFailedToResolve) r="Failed to resolve '%s'!";;
 		errorTryFailed) r="Command failed: %s";;
 		errorNftFileInstall) r="Failed to install fw4 nft file '%s'!";;
-		errorDownloadUrlNoHttps) r="Failed to download '%s', HTTPS is not supported!";;
 		errorDownloadUrl) r="Failed to download '%s'!";;
 		errorNoDownloadWithSecureReload) r="Policy '%s' refers to URL which can't be downloaded in 'secure_reload' mode!";;
-		errorFileSchemaRequiresCurl) r="The file:// schema requires curl, but it's not detected on this system!";;
+                errorDownloadUnsupported) r="Unsupported scheme to download '%s'";
 		errorIncompatibleUserFile) r="Incompatible custom user file detected '%s'!";;
 		errorDefaultFw4TableMissing) r="Default fw4 table '%s' is missing!";;
 		errorDefaultFw4ChainMissing) r="Default fw4 chain '%s' is missing!";;
@@ -399,45 +403,37 @@ get_text() {
 	esac
 	echo "$r"
 }
-
-process_url() {
-	local url="$1"
-	local dl_command dl_https_supported dl_temp_file
-# TODO: check for FILE schema and missing curl
-	if is_present 'curl'; then
-		dl_command="curl --silent --insecure"
-		dl_flag="-o"
-	elif is_present '/usr/libexec/wget-ssl'; then
-		dl_command="/usr/libexec/wget-ssl --no-check-certificate -q"
-		dl_flag="-O"
-	elif is_present wget && wget --version 2>/dev/null | grep -q "+https"; then
-		dl_command="wget --no-check-certificate -q"
-		dl_flag="-O"
-	else
-		dl_command="uclient-fetch --no-check-certificate -q"
-		dl_flag="-O"
-	fi
-	if curl --version 2>/dev/null | grep -q "Protocols: .*https.*" \
-		|| wget --version 2>/dev/null | grep -q "+ssl"; then
-		dl_https_supported=1
-	else
-		unset dl_https_supported
-	fi
-	while [ -z "$dl_temp_file" ] || [ -e "$dl_temp_file" ]; do
-		dl_temp_file="$(mktemp -u -q -t "${packageName}_tmp.XXXXXXXX")"
-	done
-	if is_url_file "$url" && ! is_present 'curl'; then
-		state add 'errorSummary' 'errorFileSchemaRequiresCurl' "$url"
-	elif is_url_https "$url" && [ -z "$dl_https_supported" ]; then
-		state add 'errorSummary' 'errorDownloadUrlNoHttps' "$url"
-	elif $dl_command "$url" "$dl_flag" "$dl_temp_file" 2>/dev/null; then
-		sed 'N;s/\n/ /;s/\s\+/ /g;' "$dl_temp_file"
-	else
-		state add 'errorSummary' 'errorDownloadUrl' "$url"
-	fi
-	rm -f "$dl_temp_file"
+set_dl() {
+	[ -x "$wget" ] && {
+		dl_schemes='ftp http'
+		dl_command="$wget -q --no-check-certificate"
+		dl_flag='-O'
+	}
+	[ -x "$fetch" ] && {
+		[ -f "$fetchssl" ] && dl_schemes='ftp http https' || dl_schemes='ftp http'
+		dl_command="$fetch -q --no-check-certificate"
+		dl_flag='-O'
+	}
+	[ -x "$wgetssl" ] && {
+		dl_schemes='ftp http https'
+		dl_command="$wgetssl -q --no-check-certificate"
+		dl_flag='-O'
+	}
+	[ -x "$curl" ] && {
+		dl_schemes='ftp http https file'
+		dl_command="$curl --silent --insecure"
+		dl_flag='-o'
+	}
+	[ -n "$dl_command" ]
 }
-
+process_url() {
+	[ -n "$dl_command" ] || set_dl || return 1
+	local url="$1" scheme="${1%%://*}"
+	str_contains_word "$dl_schemes" $scheme || {
+		state add 'errorSummary' 'errorDownloadUnsupported' "$url"
+	}
+	$dl_command "$url" "$dl_flag" - | xargs
+}
 load_package_config() {
 	local param="$1"
 	local user_file_check_result i
