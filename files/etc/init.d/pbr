@@ -1283,7 +1283,7 @@ policy_routing() {
 
 		if [ -n "$dest_addr" ]; then 
 			if [ "${dest_addr:0:1}" = "!" ]; then
-				negation='!='; value="${src_addr//\!}"; nftset_suffix='_neg';
+				negation='!='; value="${dest_addr//\!}"; nftset_suffix='_neg';
 			else
 				unset negation; value="$dest_addr"; unset nftset_suffix;
 			fi
