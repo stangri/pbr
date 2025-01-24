@@ -47,7 +47,6 @@ readonly xrayIfacePrefix='xray_'
 readonly rtTablesFile='/etc/iproute2/rt_tables'
 
 # package config options
-procd_boot_timeout=
 enabled=
 fw_mask=
 icmp_interface=
@@ -55,11 +54,8 @@ ignored_interface=
 ipv6_enabled=
 nft_user_set_policy=
 nft_user_set_counter=
-procd_boot_delay=
 procd_reload_delay=
-procd_slow_start=
 procd_lan_device=
-procd_wan_ignore_status=
 procd_wan_interface=
 procd_wan6_interface=
 procd_wan6_metric='128'
@@ -462,12 +458,8 @@ load_package_config() {
 	config_get_bool strict_enforcement        'config' 'strict_enforcement' '1'
 	config_get      supported_interface       'config' 'supported_interface'
 	config_get      verbosity                 'config' 'verbosity' '2'
-	config_get      procd_boot_delay          'config' 'procd_boot_delay' '0'
-	config_get      procd_boot_timeout        'config' 'procd_boot_timeout' '30'
 	config_get      procd_reload_delay        'config' 'procd_reload_delay' '0'
-	config_get_bool procd_slow_start          'config' 'procd_slow_start' '0'
 	config_get      procd_lan_device          'config' 'procd_lan_device'  'br-lan'
-	config_get      procd_wan_ignore_status   'config' 'procd_wan_ignore_status' '1'
 	config_get      procd_wan_interface       'config' 'procd_wan_interface'  'wan'
 	config_get      procd_wan6_interface      'config' 'procd_wan6_interface' 'wan6'
 	config_get      wan_ip_rules_priority     'config' 'wan_ip_rules_priority' '30000'
@@ -510,7 +502,6 @@ load_package_config() {
 		${nft_set_policy:+ policy "$nft_set_policy";} \
 		${nft_set_timeout:+ timeout "$nft_set_timeout";} \
 		"
-
 }
 
 # shellcheck disable=SC2317
@@ -625,21 +616,13 @@ load_network() {
 
 is_wan_up() {
 	local sleepCount='1' param="$1"
-	[ "$procd_wan_ignore_status" -eq '1' ] && return 0
-	[ "$param" = 'on_boot' ] || procd_boot_timeout='1'
 	if [ -z "$(uci_get network "$procd_wan_interface")" ]; then
 		state add 'errorSummary' 'errorNoWanInterface' "$procd_wan_interface"
 		state add 'errorSummary' 'errorNoWanInterfaceHint'
 		return 1
 	fi
-	while [ -z "$wanGW" ]; do
-		load_network "$param"
-		if [ "$((sleepCount))" -gt "$((procd_boot_timeout))" ] || [ -n "$wanGW" ]; then break; fi
-		output "$serviceName waiting for $procd_wan_interface gateway...\n"
-		sleep 1
-		network_flush_cache
-		sleepCount=$((sleepCount+1))
-	done
+	network_flush_cache
+	load_network "$param"
 	if [ -n "$wanGW" ]; then
 		return 0
 	else
@@ -1980,14 +1963,10 @@ user_file_process() {
 }
 
 boot() {
-	local procd_boot_delay
-	config_load "$packageName"
-	config_get procd_boot_delay 'config' 'procd_boot_delay' '0'
 	nft_file 'delete'
 	ubus -t 30 wait_for network.interface 2>/dev/null
 	pbr_boot_flag=1
-	{ is_integer "$procd_boot_delay" && sleep "$procd_boot_delay"; \
-		rc_procd start_service 'on_boot' && service_started 'on_boot'; } &
+	rc_procd start_service 'on_boot' && service_started 'on_boot'
 }
 
 on_firewall_reload() { 
@@ -2182,25 +2161,21 @@ service_triggers() {
 		load_validate_policy
 		load_validate_include
 	procd_close_validate
-	if [ -n "$pbr_boot_flag" ] && [ "$procd_slow_start" = '1' ]; then
-		# Make the first start robust to slow interfaces; wait a while
-		output "Setting trigger for slow start "
+	if [ -n "$pbr_boot_flag" ]; then
+		output "Setting triggers (on_boot) "
 # shellcheck disable=SC2015
 		procd_add_raw_trigger "interface.*.up" 5000 "/etc/init.d/${packageName}" start && output_okn || output_failn
 	else
-		# reload with normal parameters
 		procd_open_trigger
 			procd_add_config_trigger "config.change" 'openvpn' "/etc/init.d/${packageName}" reload 'on_openvpn_change'
 			procd_add_config_trigger "config.change" "${packageName}" "/etc/init.d/${packageName}" reload
 			for n in $ifacesSupported; do 
-				procd_add_raw_trigger "interface.*" '5000' "/etc/init.d/${packageName}" on_interface_reload "$n"
-#				procd_add_interface_trigger "interface.*" "$n" "/etc/init.d/${packageName}" on_interface_reload "$n"
+				procd_add_interface_trigger "interface.*" "$n" "/etc/init.d/${packageName}" on_interface_reload "$n"
 			done
 		procd_close_trigger
-#		procd_add_raw_trigger "interface.*.up" 4000 "/etc/init.d/${packageName}" restart 'on_interface_up'
-		if [ "$serviceStartTrigger" = 'on_start' ]; then
-			output 3 "$serviceName monitoring interfaces: ${ifacesSupported}\n"
-		fi
+	fi
+	if [ "$serviceStartTrigger" = 'on_start' ]; then
+		output 3 "$serviceName monitoring interfaces: ${ifacesSupported}\n"
 	fi
 }
 
@@ -2383,12 +2358,8 @@ load_validate_config() {
 		'icmp_interface:or("", tor, uci("network", "@interface"))' \
 		'ignored_interface:list(or(tor, uci("network", "@interface")))' \
 		'supported_interface:list(or(ignore, tor, regex("xray_.*"), uci("network", "@interface")))' \
-		'procd_boot_delay:integer:0' \
-		'procd_boot_timeout:integer:30' \
 		'procd_reload_delay:integer:0' \
 		'procd_lan_device:list(or(network)):br-lan' \
-		'procd_slow_start:bool:0' \
-		'procd_wan_ignore_status:bool:1' \
 		'procd_wan_interface:network:wan' \
 		'procd_wan6_interface:network:wan6' \
 		'wan_ip_rules_priority:uinteger:30000' \
