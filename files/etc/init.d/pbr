@@ -1761,7 +1761,7 @@ process_interface() {
 		return 0
 	fi
 
-	if is_wg_server "$iface"; then
+	if is_wg_server "$iface" && ! is_ignored_interface "$iface"; then
 		local disabled listen_port
 		disabled="$(uci_get 'network' "$iface" 'disabled')"
 		listen_port="$(uci_get 'network' "$iface" 'listen_port')"
