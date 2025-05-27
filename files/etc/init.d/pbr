@@ -17,6 +17,7 @@ readonly PKG_VERSION='dev-test'
 readonly packageCompat='11'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
+readonly packageDebugFile="/etc/config/${packageName}.debug"
 readonly packageLockFile="/var/run/${packageName}.lock"
 readonly dnsmasqFileDefault="/var/run/${packageName}.dnsmasq"
 readonly _OK_='\033[0;32m\xe2\x9c\x93\033[0m'
@@ -313,6 +314,7 @@ check_dnsmasq_nftset() {
 	check_nft || return 1
 	check_dnsmasq || return 1
 	o="$(dnsmasq -v 2>/dev/null)"
+	echo "$o" >> "$packageDebugFile"
 	! echo "$o" | grep -q 'no-nftset' && echo "$o" | grep -q 'nftset'
 }
 print_json_bool() { json_init; json_add_boolean "$1" "$2"; json_dump; json_cleanup; }
