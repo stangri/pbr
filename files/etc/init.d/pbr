@@ -967,7 +967,7 @@ resolver() {
 						state add 'errorSummary' 'errorNoNft'
 						return 1
 					fi
-					if ! dnsmasq -v 2>/dev/null | grep -q 'no-nftset' && dnsmasq -v 2>/dev/null | grep -q 'nftset'; then
+					if check_dnsmasq_nftset; then
 						resolver_set_supported='true'
 						return 0
 					else
