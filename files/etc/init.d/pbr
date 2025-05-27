@@ -1756,7 +1756,7 @@ process_interface() {
 
 	if [ "$iface" = 'tor' ]; then 
 		case "$action" in
-			create|reload|interface_reload)
+			create|reload|reload_interface)
 				torDnsPort="$(get_tor_dns_port)"
 				torTrafficPort="$(get_tor_traffic_port)"
 				displayText="${iface}/53->${torDnsPort}/80,443->${torTrafficPort}"
@@ -1773,7 +1773,7 @@ process_interface() {
 		disabled="$(uci_get 'network' "$iface" 'disabled')"
 		listen_port="$(uci_get 'network' "$iface" 'listen_port')"
 		case "$action" in
-			create|reload)
+			create|reload|reload_interface)
 				if [ "$disabled" != '1' ] && [ -n "$listen_port" ]; then
 					if [ -n "$wanIface4" ]; then
 						ip rule del sport "$listen_port" table "pbr_${wanIface4}" >/dev/null 2>&1
