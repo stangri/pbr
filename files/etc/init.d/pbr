@@ -17,7 +17,7 @@ readonly PKG_VERSION='dev-test'
 readonly packageCompat='11'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
-readonly packageDebugFile="/etc/config/${packageName}.debug"
+readonly packageDebugFile="/var/run/${packageName}.debug"
 readonly packageLockFile="/var/run/${packageName}.lock"
 readonly dnsmasqFileDefault="/var/run/${packageName}.dnsmasq"
 readonly _OK_='\033[0;32m\xe2\x9c\x93\033[0m'
@@ -218,7 +218,7 @@ is_default_dev() { [ "$1" = "$(ip -4 r | grep -m1 'dev' | grep -Eso 'dev [^ ]*' 
 is_disabled_interface() { [ "$(uci_get 'network' "$1" 'disabled')" = '1' ]; }
 is_host() { echo "$1" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9]$|^[a-zA-Z0-9]$'; }
 is_hostname() { echo "$1" | grep -qE '^([a-zA-Z0-9]([a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-_]{0,61}[a-zA-Z])?$'; }
-is_domain() { is_host "$1" || is_hostname "$1"; }
+is_domain() { ! is_ipv4 "$1" && echo "$1" | grep -qE "^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"; }
 is_dslite() { local p; network_get_protocol p "$1"; [ "${p:0:6}" = "dslite" ]; }
 is_family_mismatch() { ( is_ipv4 "${1//!}" && is_ipv6 "${2//!}" ) || ( is_ipv6 "${1//!}" && is_ipv4 "${2//!}" ); }
 is_greater() { test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"; }
@@ -226,7 +226,7 @@ is_greater_or_equal() { test "$(printf '%s\n' "$@" | sort -V | head -n '1')" = "
 is_ignored_interface() { str_contains_word "$ignored_interface" "$1"; }
 is_ignore_target() { [ "$(str_to_lower "$1")" = 'ignore' ]; }
 is_integer() { case "$1" in ''|*[!0-9]*) return 1;; esac; }
-is_ipv4() { expr "${1%/*}" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' >/dev/null; }
+is_ipv4() { echo "$1" | grep -qE '^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})(/(3[0-2]|[12]?[0-9]))?$'; }
 is_ipv6() { ! is_mac_address "$1" && str_contains "$1" ':'; }
 is_ipv6_global_scope() { [ "${1:0:4}" = '2001' ]; }
 is_ipv6_local_scope() { is_ipv6_local_link "$1" || is_ipv6_local_unique "$1"; }
@@ -314,7 +314,11 @@ check_dnsmasq_nftset() {
 	check_nft || return 1
 	check_dnsmasq || return 1
 	o="$(dnsmasq -v 2>/dev/null)"
-	echo "$o" >> "$packageDebugFile"
+	{ 
+		echo 'dnsmasq output dump';
+		echo "$o"; 
+		echo '-------------------------'; 
+	} >> "$packageDebugFile"
 	! echo "$o" | grep -q 'no-nftset' && echo "$o" | grep -q 'nftset'
 }
 print_json_bool() { json_init; json_add_boolean "$1" "$2"; json_dump; json_cleanup; }
