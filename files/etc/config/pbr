@@ -1,4 +1,5 @@
 config pbr 'config'
+	option debug_dnsmasq '0'
 	option enabled '0'
 	option verbosity '2'
 	option strict_enforcement '1'

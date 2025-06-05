@@ -48,6 +48,7 @@ readonly xrayIfacePrefix='xray_'
 readonly rtTablesFile='/etc/iproute2/rt_tables'
 
 # package config options
+debug_dnsmasq=
 enabled=
 fw_mask=
 icmp_interface=
@@ -315,7 +316,7 @@ check_dnsmasq_nftset() {
 	check_nft || return 1
 	check_dnsmasq || return 1
 	o="$(dnsmasq -v 2>/dev/null)"
-	{ 
+	[ -n "$debug_dnsmasq" ] && { 
 		echo " $(date) dnsmasq output dump:";
 # shellcheck disable=SC3003
 		echo  "${o%$'\n'$'\n'This*}"; 
@@ -455,6 +456,7 @@ load_package_config() {
 	local param="$1"
 	local user_file_check_result i
 	config_load "$packageName"
+	config_get_bool debug_dnsmasq             'config' 'debug_dnsmasq' '0'
 	config_get_bool enabled                   'config' 'enabled' '0'
 	config_get      fw_mask                   'config' 'fw_mask' 'ff0000'
 	config_get      icmp_interface            'config' 'icmp_interface'
@@ -489,6 +491,7 @@ load_package_config() {
 	fw_maskXor="$(printf '%#x' "$((fw_mask ^ 0xffffffff))")"
 	fw_maskXor="${fw_maskXor:-0xff00ffff}"
 
+	[ "$debug_dnsmasq" != '1' ]          && unset debug_dnsmasq
 	[ "$nft_rule_counter" != '1' ]       && unset nft_rule_counter
 	[ "$nft_set_auto_merge" != '1' ]     && unset nft_set_auto_merge
 	[ "$nft_set_counter" != '1' ]        && unset nft_set_counter
@@ -2383,6 +2386,7 @@ status_service() {
 # shellcheck disable=SC2120
 load_validate_config() {
 	uci_load_validate "$packageName" "$packageName" "$1" "${2}${3:+ $3}" \
+		'debug_dnsmasq:bool:0' \
 		'enabled:bool:0' \
 		'strict_enforcement:bool:1' \
 		'ipv6_enabled:bool:0' \
