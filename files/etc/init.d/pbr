@@ -316,8 +316,8 @@ check_dnsmasq_nftset() {
 	check_dnsmasq || return 1
 	o="$(dnsmasq -v 2>/dev/null)"
 	{ 
-		echo 'dnsmasq output dump';
-		echo "$o"; 
+		echo " $(date) dnsmasq output dump:";
+		echo  "${o%$'\n'$'\n'This*}"; 
 		echo '-------------------------'; 
 	} >> "$packageDebugFile"
 	! echo "$o" | grep -q 'no-nftset' && echo "$o" | grep -q 'nftset'
