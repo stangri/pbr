@@ -14,7 +14,7 @@ USE_PROCD=1
 
 readonly packageName='pbr'
 readonly PKG_VERSION='dev-test'
-readonly packageCompat='12'
+readonly packageCompat='13'
 readonly serviceName="$packageName $PKG_VERSION"
 readonly packageConfigFile="/etc/config/${packageName}"
 readonly packageDebugFile="/var/run/${packageName}.debug"
@@ -317,6 +317,7 @@ check_dnsmasq_nftset() {
 	o="$(dnsmasq -v 2>/dev/null)"
 	{ 
 		echo " $(date) dnsmasq output dump:";
+# shellcheck disable=SC3003
 		echo  "${o%$'\n'$'\n'This*}"; 
 		echo '-------------------------'; 
 	} >> "$packageDebugFile"
@@ -843,16 +844,16 @@ cleanup_sets() {
 }
 
 state() {
-	local action="$1" param="$2" value="${3//#/_}"
-	local array_name
-	shift 3
-# shellcheck disable=SC2124
-	local extras="$@"
-	local line error_id error_extra label
+	local action="$1" param="$2"
+	shift 2
+	local value="$*"
+	local line error_id error_extra array_name label
 	case "$action" in
 		add)
-			line="$(eval echo "\$$param")"
-			eval "$param"='${line:+$line#}${value}${extras:+ $extras}'
+			line="$(eval echo "\"\$$param\"")"
+			value="${line:+$line\n}${value}"
+# shellcheck disable=SC3037
+			eval "$param=\"$(echo -e "$value")\""
 		;;
 		json)
 			json_init
@@ -864,7 +865,7 @@ state() {
 					array_name='warnings';;
 			esac
 			json_add_array "$array_name"
-			if [ -n "$(eval echo "\$$param")" ]; then
+			if [ -n "$(eval echo "\"\$$param\"")" ]; then
 				while read -r line; do
 					if str_contains "$line" ' '; then
 						error_id="${line%% *}"
@@ -877,7 +878,7 @@ state() {
 					json_add_string 'extra' "$error_extra"
 					json_close_object
 				done <<EOF
-$(eval echo "\$$param" | tr \# \\n)
+$(eval echo "\"\$$param\"")
 EOF
 			fi
 			json_close_array
@@ -885,7 +886,7 @@ EOF
 			json_dump
 		;;
 		print)
-			[ -z "$(eval echo "\$$param")" ] && return 0
+			[ -z "$(eval echo "\"\$$param\"")" ] && return 0
 			case "$param" in
 				errorSummary)
 					label="${_ERROR_}:";;
@@ -902,11 +903,11 @@ EOF
 						printf "%b $(get_text "$error_id")\n" "$label"
 					fi
 				done <<EOF
-$(eval echo "\$$param" | tr \# \\n)
+$(eval echo "\"\$$param\"")
 EOF
 		;;
 		set)
-			eval "$param"='${value}${extras:+ $extras}'
+			eval "$param"='$value'
 		;;
 	esac
 }
