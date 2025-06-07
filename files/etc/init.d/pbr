@@ -2031,6 +2031,7 @@ start_service() {
 	local resolverStoredHash resolverNewHash i param="$1" reloadedIface
 
 	[ -n "$pbr_boot_flag" ] && return 0
+	[ "$param" = 'on_boot' ] && return 0
 	load_environment "${param:-on_start}" "$(load_validate_config)" || return 1
 	is_wan_up "$param" || return 1
 
@@ -2164,6 +2165,8 @@ start_service() {
 }
 
 service_started() {
+	[ -n "$pbr_boot_flag" ] && return 0
+	[ "$param" = 'on_boot' ] && return 0
 	if nft_file 'exists'; then
 		procd_set_config_changed firewall
 		if nft_file 'exists'; then
