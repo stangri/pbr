@@ -2039,7 +2039,7 @@ start_service() {
 	[ -n "$pbr_boot_flag" ] && return 0
 	[ "$param" = 'on_boot' ] && return 0
 	load_environment "${param:-on_start}" "$(load_validate_config)" || return 1
-	is_wan_up "$param" || return 1
+	is_wan_up "$param" || { output "${_ERROR_}: Uplink/WAN interface is still down, increase value of 'procd_boot_trigger_delay' option!\n";  return 1; }
 
 	process_interface 'all' 'prepare'
 	config_foreach process_interface 'interface' 'pre_init'
@@ -2172,7 +2172,7 @@ start_service() {
 
 service_started() {
 	[ -n "$pbr_boot_flag" ] && return 0
-	[ "$param" = 'on_boot' ] && return 0
+
 	if nft_file 'exists'; then
 		procd_set_config_changed firewall
 		if nft_file 'exists'; then
