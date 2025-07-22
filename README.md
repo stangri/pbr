@@ -14,5 +14,5 @@ Allows routing specific traffic (by IP, MAC, port, protocol, or domain) through 
 - Lightweight shell-based implementation
 - Optional Web UI integration via LuCI
 
-📚 **Full documentation:**  
+**Full documentation:**  
 [https://docs.openwrt.melmac.net/pbr/](https://docs.openwrt.melmac.net/pbr/)
