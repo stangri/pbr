@@ -1,7 +1,7 @@
 # Policy-Based Routing (pbr)
 
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-Compatible-blueviolet)](https://openwrt.org)
-[![Web UI](https://img.shields.io/badge/Web_UI-Available-blue)](https://docs.openwrt.melmac.net/pbr/)
+[![Web UI](https://img.shields.io/badge/Web_UI-Available-blue)](https://docs.openwrt.melmac.ca/pbr/)
 [![License](https://img.shields.io/badge/License-GPL--3.0-lightgrey)](https://github.com/stangri/pbr/blob/master/LICENSE)
 
 Flexible rule-based routing framework for OpenWrt.  
@@ -19,4 +19,4 @@ For ongoing development, see the [1.1.9 branch](https://github.com/stangri/pbr/b
 - Resolver health checks and rule-based rollback
 
 **Full documentation:**  
-[https://docs.openwrt.melmac.net/pbr/](https://docs.openwrt.melmac.net/pbr/)
+[https://docs.openwrt.melmac.ca/pbr/](https://docs.openwrt.melmac.ca/pbr/)
